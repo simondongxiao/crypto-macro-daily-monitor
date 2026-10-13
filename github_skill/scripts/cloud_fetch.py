@@ -32,7 +32,7 @@ BINANCE_BASES = (
     "https://fapi2.binance.com",
     "https://fapi3.binance.com",
 )
-BYBIT_BASE = "https://api.bybit.com"
+BYBIT_BASE = "https://api.bytick.com"
 
 
 def binance(path, **params):
