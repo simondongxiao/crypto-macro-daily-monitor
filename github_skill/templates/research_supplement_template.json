@@ -1,0 +1,193 @@
+{
+  "snapshot_bjt": "2026-10-13T08:11:23.049021+08:00",
+  "macro_event_outcome": {
+    "event": "September 15-16, 2026 FOMC minutes",
+    "released_bjt": "2026-10-08T02:00:00+08:00",
+    "outcome": "Minutes said inflation remained elevated and most participants judged another rate increase by year end could be appropriate; the next meeting is scheduled for October 27-28.",
+    "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+    "evidence": "VERIFIED_PRIMARY"
+  },
+  "etf_flows_usd_m": [
+    {
+      "date": "2026-10-01",
+      "BTC": 102.7,
+      "ETH": -55.4,
+      "SOL": -1.1
+    },
+    {
+      "date": "2026-10-02",
+      "BTC": 189.9,
+      "ETH": -37.4,
+      "SOL": 1.3
+    },
+    {
+      "date": "2026-10-05",
+      "BTC": -89.8,
+      "ETH": -50.8,
+      "SOL": -9.2
+    },
+    {
+      "date": "2026-10-06",
+      "BTC": -3.2,
+      "ETH": 0.0,
+      "SOL": -3.7
+    },
+    {
+      "date": "2026-10-07",
+      "BTC": 332.2,
+      "ETH": null,
+      "SOL": null
+    }
+  ],
+  "etf_sources": {
+    "BTC": "https://www.cryptometer.io/etf",
+    "ETH": "https://alphafinance.io/etf/",
+    "SOL": "https://alphafinance.io/etf/"
+  },
+  "options_derived": {
+    "BTC_near_expiry": "13OCT26",
+    "BTC_near_max_pain": "UNAVAILABLE_THIS_RUN",
+    "ETH_near_expiry": "13OCT26",
+    "ETH_near_max_pain": "UNAVAILABLE_THIS_RUN",
+    "method": "Deribit public open-interest snapshot; max-pain not recalculated into a stable numeric level in this run",
+    "evidence": "DERIBIT_VERIFIED / DERIVED_PARTIAL"
+  },
+  "alt_snapshot": {
+    "AVAX": {
+      "change24_pct": -8.184,
+      "oi24_pct": -10.372100198595902,
+      "funding_pct": -0.001133,
+      "taker_last": 0.8042
+    },
+    "XRP": {
+      "change24_pct": -5.212,
+      "oi24_pct": -2.41607265797662,
+      "funding_pct": -0.0064540000000000005,
+      "taker_last": 0.8719
+    },
+    "DOGE": {
+      "change24_pct": -5.543,
+      "oi24_pct": -7.545026078625283,
+      "funding_pct": -0.000589,
+      "taker_last": 0.5837
+    }
+  },
+  "alt_fundamentals": {
+    "AVAX": {
+      "theme": "L1 / high-beta ecosystem",
+      "tvl_usd": 642517737,
+      "tvl_7d_pct": 1.85,
+      "dex_volume_7d_pct": -4.76,
+      "fees_7d_pct": null,
+      "unlock": "Public unlock field not verified in this run; no standalone long plan",
+      "sources": [
+        "https://api.llama.fi/v2/historicalChainTvl/avalanche",
+        "https://api.llama.fi/overview/dexs/avalanche"
+      ]
+    },
+    "XRP": {
+      "theme": "Payments / regulatory-beta narrative",
+      "tvl_usd": null,
+      "tvl_7d_pct": null,
+      "dex_volume_7d_pct": null,
+      "fees_7d_pct": null,
+      "unlock": "No comparable public unlock field verified in this run",
+      "sources": [
+        "Binance USDⓈ-M market snapshot",
+        "public-source scan"
+      ]
+    }
+  },
+  "catalysts": [
+    {
+      "event": "September 15-16 FOMC minutes",
+      "classification": "Event Outcome",
+      "first_confirmed": "Federal Reserve minutes page",
+      "incremental_change": "已落地：通胀仍高，多数委员认为年内再次加息可能合适；不是新的利率决定",
+      "time_bjt": "2026-10-08 02:00",
+      "assets": "BTC/ETH/SOL and rates",
+      "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm"
+    },
+    {
+      "event": "Stable token scheduled unlock",
+      "classification": "Event Outcome",
+      "first_confirmed": "DefiLlama unlock calendar",
+      "incremental_change": "计划日期已过去；本轮未取得实际解锁结果，不能把它继续列为待公布事件",
+      "time_bjt": "2026-10-08",
+      "assets": "STABLE",
+      "source": "https://defillama.com/calendar?type=Unlock"
+    },
+    {
+      "event": "Movement scheduled unlock",
+      "classification": "Event Outcome",
+      "first_confirmed": "DefiLlama unlock calendar",
+      "incremental_change": "计划日期已过去；本轮未取得实际解锁结果，不能把它继续列为待公布事件",
+      "time_bjt": "2026-10-09",
+      "assets": "MOVE",
+      "source": "https://defillama.com/calendar?type=Unlock"
+    },
+    {
+      "event": "Solana scheduled staking rewards",
+      "classification": "Event Outcome",
+      "first_confirmed": "DefiLlama unlock schedule",
+      "incremental_change": "计划时间已过去；本轮未取得实际发放结果，不能继续列为待公布事件",
+      "time_bjt": "2026-10-12 00:55",
+      "assets": "SOL",
+      "source": "https://defillama.com/protocol/unlocks/solana"
+    },
+    {
+      "event": "US September CPI",
+      "classification": "Known Scheduled Event",
+      "first_confirmed": "BLS 2026 release calendar",
+      "incremental_change": "No change; retained as known schedule",
+      "time_bjt": "2026-10-14 20:30",
+      "assets": "BTC/ETH/SOL and rates",
+      "source": "https://www.bls.gov/schedule/2026/home.htm"
+    },
+    {
+      "event": "US September PPI",
+      "classification": "Known Scheduled Event",
+      "first_confirmed": "BLS 2026 release calendar",
+      "incremental_change": "No change; retained as known schedule",
+      "time_bjt": "2026-10-15 20:30",
+      "assets": "BTC/ETH/SOL and rates",
+      "source": "https://www.bls.gov/schedule/2026/home.htm"
+    },
+    {
+      "event": "Arbitrum scheduled unlock",
+      "classification": "Known Scheduled Event",
+      "first_confirmed": "DefiLlama unlock calendar",
+      "incremental_change": "No change; about 1.37% of float, outside 7-day but inside 30-day window",
+      "time_bjt": "2026-10-15",
+      "assets": "ARB / L2 beta",
+      "source": "https://defillama.com/calendar?type=Unlock"
+    },
+    {
+      "event": "FOMC meeting and press conference",
+      "classification": "Known Scheduled Event",
+      "first_confirmed": "Federal Reserve 2026 calendar",
+      "incremental_change": "No change; next meeting October 27-28",
+      "time_bjt": "2026-10-29 around 02:00",
+      "assets": "BTC/ETH/SOL and rates",
+      "source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+    },
+    {
+      "event": "US advance Q3 GDP and September PCE",
+      "classification": "Known Scheduled Event",
+      "first_confirmed": "BEA 2026 release calendar",
+      "incremental_change": "No change; retained as known schedule",
+      "time_bjt": "2026-10-29 20:30",
+      "assets": "BTC/ETH/SOL and rates",
+      "source": "https://bea.gov/news/schedule/full"
+    },
+    {
+      "event": "CLARITY Act Senate cloture vote",
+      "classification": "Event Outcome",
+      "first_confirmed": "US Senate Daily Press 2026-09-15",
+      "incremental_change": "No new vote date confirmed in this scan",
+      "time_bjt": "2026-09-16 completed",
+      "assets": "US crypto market structure",
+      "source": "https://www.dailypress.senate.gov/tuesday-september-15-2026/"
+    }
+  ]
+}
