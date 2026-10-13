@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-13",
+  "assets": {
+    "BTCUSDT": {
+      "long_zone": [],
+      "short_zone": [
+        83434.23,
+        83614.23
+      ],
+      "alerted_long": false,
+      "alerted_short": false
+    },
+    "ETHUSDT": {
+      "long_zone": [],
+      "short_zone": [],
+      "alerted_long": false,
+      "alerted_short": false
+    },
+    "SOLUSDT": {
+      "long_zone": [],
+      "short_zone": [],
+      "alerted_long": false,
+      "alerted_short": false
+    }
+  }
+}
