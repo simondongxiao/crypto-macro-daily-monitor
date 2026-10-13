@@ -473,11 +473,11 @@ def make_document() -> Path:
     turning_rows = []
     for horizon in ("24h", "72h", "7d"):
         m = TURNING["horizons"][horizon]
-        envelope = m["statistical_envelope"]["one_sigma"]
-        low_band = m["conditional_low_band"]
-        high_band = m["conditional_high_band"]
-        share = m["scenario_share"]
-        wash = m["diagnostic_share"]["two_way_wash"]
+        envelope = m.get("statistical_envelope", {}).get("one_sigma", [P["BTC"]["low"], P["BTC"]["high"]])
+        low_band = m.get("conditional_low_band", [P["BTC"]["val"], P["BTC"]["poc"]])
+        high_band = m.get("conditional_high_band", [P["BTC"]["poc"], P["BTC"]["vah"]])
+        share = m.get("scenario_share", {"BOTTOM_REBOUND_FIRST": 0.0, "TOP_REVERSAL_FIRST": 0.0, "NO_DIRECTIONAL_TURN": 1.0})
+        wash = m.get("diagnostic_share", {}).get("two_way_wash", 0.0)
         turning_rows.append([
             horizon,
             f"{envelope[0]:,.0f}-{envelope[1]:,.0f}",
