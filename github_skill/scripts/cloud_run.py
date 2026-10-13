@@ -141,8 +141,15 @@ def main() -> None:
     data_path = run_fetch()
     supplement_path, views_path = make_research_inputs(data_path)
     report = build_report(data_path, supplement_path, views_path)
+    html_path = REPORTS / f"{report.stem}.html"
+    subprocess.run(
+        [sys.executable, str(BUNDLE / "scripts" / "docx_to_html.py"), str(report), str(html_path)],
+        cwd=BUNDLE,
+        check=True,
+    )
+    shutil.copyfile(html_path, REPORTS / "index.html")
     update_conditions(data_path)
-    print(json.dumps({"report": str(report), "conditions": str(CONFIG)}, ensure_ascii=False))
+    print(json.dumps({"report": str(report), "html": str(html_path), "conditions": str(CONFIG)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
