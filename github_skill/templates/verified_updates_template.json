@@ -1,0 +1,57 @@
+{
+  "cutoff_bjt": "2026-10-13T08:11:23.049021+08:00",
+  "status": "NO_MATERIAL_CHANGE",
+  "covered_universe": [
+    "Donald Trump",
+    "Cynthia Lummis",
+    "Elizabeth Warren",
+    "Paul Atkins",
+    "Ray Dalio",
+    "Larry Fink",
+    "Michael Saylor",
+    "Elon Musk",
+    "Jamie Dimon",
+    "Brian Armstrong",
+    "Vitalik Buterin",
+    "Changpeng Zhao"
+  ],
+  "candidate_count": 36,
+  "primary_or_credible_checks": [
+    {
+      "person": "Paul Atkins",
+      "result": "REPEATED_POLICY_ACTION",
+      "note": "The October 1 SEC crypto-custody proposal remains the latest verified material action; no newer stance change found."
+    },
+    {
+      "person": "Cynthia Lummis / US Senate",
+      "result": "NO_NEW_SCHEDULE",
+      "note": "No new CLARITY vote date was found in this scan."
+    },
+    {
+      "person": "Donald Trump / White House",
+      "result": "NO_VERIFIED_NEW_POLICY",
+      "note": "No new official crypto policy position was validated in this run."
+    },
+    {
+      "person": "Michael Saylor",
+      "result": "PRODUCT_PROMOTION_NOT_STANCE_CHANGE",
+      "note": "Recent product messaging does not change the standing pro-Bitcoin view."
+    },
+    {
+      "person": "Ray Dalio",
+      "result": "NO_NEW_PRIMARY_UPDATE",
+      "note": "The gold-plus-small-Bitcoin allocation view remains the latest verified stance."
+    },
+    {
+      "person": "Larry Fink",
+      "result": "STALE_REPUBLICATION",
+      "note": "No new October stance change was validated."
+    },
+    {
+      "person": "Elizabeth Warren",
+      "result": "REPEATED_CRITICISM",
+      "note": "No verified incremental change from the standing regulatory-risk stance."
+    }
+  ],
+  "updates": []
+}
