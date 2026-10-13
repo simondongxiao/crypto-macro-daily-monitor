@@ -12,7 +12,12 @@ from typing import Any
 
 import requests
 
-BINANCE_URL = "https://api.binance.com/api/v3/ticker/price"
+BINANCE_URLS = (
+    "https://api.binance.com/api/v3/ticker/price",
+    "https://api1.binance.com/api/v3/ticker/price",
+    "https://api2.binance.com/api/v3/ticker/price",
+    "https://api3.binance.com/api/v3/ticker/price",
+)
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
 ASSET_NAMES = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL"}
 
@@ -39,18 +44,21 @@ def load_conditions(path: Path) -> dict[str, Any]:
 
 
 def fetch_prices(session: requests.Session) -> dict[str, float]:
-    response = session.get(
-        BINANCE_URL,
-        params={"symbols": json.dumps(list(SYMBOLS), separators=(",", ":"))},
-        timeout=15,
-    )
-    response.raise_for_status()
-    rows = response.json()
-    prices = {row["symbol"]: float(row["price"]) for row in rows}
-    missing = [symbol for symbol in SYMBOLS if symbol not in prices]
-    if missing:
-        raise RuntimeError(f"Binance response missing: {', '.join(missing)}")
-    return prices
+    last_error: Exception | None = None
+    params = {"symbols": json.dumps(list(SYMBOLS), separators=(",", ":"))}
+    for endpoint in BINANCE_URLS:
+        try:
+            response = session.get(endpoint, params=params, timeout=15)
+            response.raise_for_status()
+            rows = response.json()
+            prices = {row["symbol"]: float(row["price"]) for row in rows}
+            missing = [symbol for symbol in SYMBOLS if symbol not in prices]
+            if not missing:
+                return prices
+            last_error = RuntimeError(f"{endpoint} missing: {', '.join(missing)}")
+        except requests.RequestException as error:
+            last_error = error
+    raise RuntimeError(f"All Binance public endpoints failed: {last_error}")
 
 
 def signal_text(side: str) -> str:
