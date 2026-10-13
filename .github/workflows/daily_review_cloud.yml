@@ -36,7 +36,7 @@ jobs:
       - name: Notify Feishu
         run: |
           report=$(find reports -maxdepth 1 -name 'crypto_macro_daily_*.docx' -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
-          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://github.com/$GITHUB_REPOSITORY/blob/main/reports/index.html"
+          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/"
 
       - name: Commit report and active conditions
         run: |
