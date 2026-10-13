@@ -1,0 +1,11 @@
+github_actions/scripts/__pycache__/
+*.pyc
+.env
+*.log
+# GitHub cloud-run intermediates
+github_skill/live_market_detail_*.json
+github_skill/research_supplement_*.json
+github_skill/verified_updates_*.json
+github_skill/_build_daily_*.py
+github_skill/reports/_assets_*
+github_skill/**/execution_learning/
