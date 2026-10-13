@@ -25,6 +25,7 @@ def main() -> None:
     parser.add_argument("--webhook", default=os.environ.get("FEISHU_WEBHOOK"))
     parser.add_argument("--report", required=True)
     parser.add_argument("--run-url", default="")
+    parser.add_argument("--html-url", default="")
     args = parser.parse_args()
     if not args.webhook:
         raise SystemExit("FEISHU_WEBHOOK is required")
@@ -36,6 +37,8 @@ def main() -> None:
         f"今日结论：{extract_summary(report)}\n\n"
         f"完整 Word 报告与历史 Artifact：{args.run_url or '请打开本次 GitHub Actions 运行记录'}"
     )
+    if args.html_url:
+        text += f"\n\n手机阅读 HTML：{args.html_url}"
     response = requests.post(
         args.webhook,
         json={"msg_type": "text", "content": {"text": text}},
