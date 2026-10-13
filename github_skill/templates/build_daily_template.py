@@ -485,7 +485,7 @@ def make_document() -> Path:
             f"{high_band[0]:,.0f}-{high_band[-1]:,.0f}",
             f"{share['BOTTOM_REBOUND_FIRST']*100:.1f}% / {share['TOP_REVERSAL_FIRST']*100:.1f}% / {share['NO_DIRECTIONAL_TURN']*100:.1f}%",
             f"{wash*100:.1f}%",
-            f"{m['effective_n']:.1f}",
+            f"{m.get('effective_n', 0.0):.1f}",
             "SHADOW_UNCALIBRATED",
         ])
     table(doc, ["窗口", "统计±1σ", "条件底带", "条件顶带", "历史近邻：底/顶/无", "双向洗盘", "有效N", "状态"], turning_rows, font=6.6)
