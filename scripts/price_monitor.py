@@ -18,6 +18,7 @@ BINANCE_URLS = (
     "https://api2.binance.com/api/v3/ticker/price",
     "https://api3.binance.com/api/v3/ticker/price",
 )
+COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
 ASSET_NAMES = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL"}
 
@@ -58,7 +59,22 @@ def fetch_prices(session: requests.Session) -> dict[str, float]:
             last_error = RuntimeError(f"{endpoint} missing: {', '.join(missing)}")
         except requests.RequestException as error:
             last_error = error
-    raise RuntimeError(f"All Binance public endpoints failed: {last_error}")
+    try:
+        response = session.get(
+            COINGECKO_URL,
+            params={"ids": "bitcoin,ethereum,solana", "vs_currencies": "usd"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        prices = {
+            "BTCUSDT": float(rows["bitcoin"]["usd"]),
+            "ETHUSDT": float(rows["ethereum"]["usd"]),
+            "SOLUSDT": float(rows["solana"]["usd"]),
+        }
+        return prices
+    except (requests.RequestException, KeyError, TypeError, ValueError) as error:
+        raise RuntimeError(f"Binance and CoinGecko public endpoints failed: {last_error}; {error}") from error
 
 
 def signal_text(side: str) -> str:
@@ -79,7 +95,7 @@ def send_feishu(session: requests.Session, webhook: str, symbol: str, side: str,
             {"tag": "div", "text": {"tag": "lark_md", "content": f"**品种：** {ASSET_NAMES[symbol]} (`{symbol}`)\n**实时价格：** `{price:,.8f}`\n**触发区间：** `{zone[0]:,.8f} - {zone[1]:,.8f}`"}},
             {"tag": "hr"},
             {"tag": "div", "text": {"tag": "lark_md", "content": f"**微观确认：** {signal_text(side)}"}},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "来源：Binance public spot ticker；请以 Daily Review 的 SL、TP、Max Entry 和失效条件为准。"}]},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "来源：Binance public ticker；若 GitHub runner 受地区限制则使用 CoinGecko 公共报价兜底。请以 Daily Review 的 SL、TP、Max Entry 和失效条件为准。"}]},
         ],
     }
     response = session.post(webhook, json={"msg_type": "interactive", "card": card}, timeout=15)
