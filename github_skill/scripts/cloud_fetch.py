@@ -33,6 +33,7 @@ BINANCE_BASES = (
     "https://fapi3.binance.com",
 )
 BYBIT_BASE = "https://api.bytick.com"
+OKX_BASE = "https://www.okx.com"
 
 
 def binance(path, **params):
@@ -52,6 +53,15 @@ def bybit(path, **params):
     if payload.get("retCode") != 0:
         raise RuntimeError(f"Bybit request failed: {payload}")
     return payload["result"]
+
+
+def okx(path, **params):
+    response = S.get(OKX_BASE + path, params=params, timeout=20)
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("code") != "0":
+        raise RuntimeError(f"OKX request failed: {payload}")
+    return payload["data"]
 
 
 def yahoo(symbol):
@@ -199,12 +209,52 @@ def asset_bybit(symbol):
     }
 
 
+def okx_klines(inst_id, bar, limit):
+    rows = okx("/api/v5/market/candles", instId=inst_id, bar=bar, limit=min(limit, 100))[0:limit]
+    rows = sorted(rows, key=lambda row: int(row[0]))
+    return [[int(row[0]), row[1], row[2], row[3], row[4], row[5], row[6]] for row in rows]
+
+
+def asset_okx(symbol):
+    inst_id = symbol.replace("USDT", "-USDT-SWAP")
+    ticker = okx("/api/v5/market/ticker", instId=inst_id)[0]
+    funding = okx("/api/v5/public/funding-rate", instId=inst_id)[0]
+    oi = okx("/api/v5/public/open-interest", instType="SWAP", instId=inst_id)[0]
+    trades = okx("/api/v5/market/trades", instId=inst_id, limit=100)
+    buy_size = sum(float(row["sz"]) for row in trades if row.get("side") == "buy")
+    sell_size = sum(float(row["sz"]) for row in trades if row.get("side") == "sell")
+    taker = buy_size / sell_size if sell_size else 1.0
+    mark = float(ticker["last"])
+    open24 = float(ticker.get("open24h") or mark)
+    open_interest = float(oi.get("oiCcy") or oi.get("oi") or 0) * mark
+    return {
+        "mark": mark,
+        "change24": (mark / open24 - 1) * 100 if open24 else 0.0,
+        "high24": float(ticker.get("high24h") or mark),
+        "low24": float(ticker.get("low24h") or mark),
+        "funding": float(funding.get("fundingRate") or 0) * 100,
+        "taker_last3": [taker, taker, taker],
+        "oi_5d": [{"value": open_interest}],
+        "oi_last": open_interest,
+        "oi24_pct": 0.0,
+        "klines": okx_klines(inst_id, "1H", 100),
+        "klines15m": okx_klines(inst_id, "15m", 32),
+        "klines4h": okx_klines(inst_id, "4H", 100),
+        "klines1d": okx_klines(inst_id, "1Dutc", 100),
+        "source": "OKX_PUBLIC_DERIVATIVES_FALLBACK",
+    }
+
+
 def asset(symbol):
     try:
         return asset_binance(symbol)
     except Exception as error:
-        print(f"Binance unavailable for {symbol}; using Bybit public fallback: {error}")
-        return asset_bybit(symbol)
+        print(f"Binance unavailable for {symbol}; trying Bybit public fallback: {error}")
+        try:
+            return asset_bybit(symbol)
+        except Exception as bybit_error:
+            print(f"Bybit unavailable for {symbol}; using OKX public fallback: {bybit_error}")
+            return asset_okx(symbol)
 
 
 def main():
@@ -214,8 +264,12 @@ def main():
     try:
         depth = binance("/fapi/v1/depth", symbol="BTCUSDT", limit=20)
     except Exception:
-        orderbook = bybit("/v5/market/orderbook", category="linear", symbol="BTCUSDT", limit=50)
-        depth = {"bids": orderbook.get("b", []), "asks": orderbook.get("a", [])}
+        try:
+            orderbook = bybit("/v5/market/orderbook", category="linear", symbol="BTCUSDT", limit=50)
+            depth = {"bids": orderbook.get("b", []), "asks": orderbook.get("a", [])}
+        except Exception:
+            orderbook = okx("/api/v5/market/books", instId="BTC-USDT-SWAP", sz=20)[0]
+            depth = {"bids": orderbook.get("bids", []), "asks": orderbook.get("asks", [])}
     stablecoins = get("https://stablecoins.llama.fi/stablecoins")
     whale_treasury_orderflow = collect_whale_treasury_orderflow(
         now,
