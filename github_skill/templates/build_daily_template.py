@@ -603,7 +603,14 @@ def make_document() -> Path:
     if not chain_rows:
         chain_rows = [["未发现 >=100 BTC", "不适用", "不适用", "最近10笔公开mempool短样本"]]
     table(doc, ["链上最近大额候选", "按现价折算", "Txid", "证据"], chain_rows, font=7.1)
-    paragraph(doc, f"本轮 Binance 现货短样本中，BTC 主动净额约 {wt['spot_orderflow']['BTC']['venues']['binance']['trade_tape']['net_aggressive_usd']/1e6:+.2f}m 美元、买方占比 {wt['spot_orderflow']['BTC']['venues']['binance']['trade_tape']['buy_share']*100:.1f}%，盘口偏差 {wt['spot_orderflow']['BTC']['venues']['binance']['order_book']['0_5pct']['imbalance']*100:+.1f}%；ETH 主动净额约 {wt['spot_orderflow']['ETH']['venues']['binance']['trade_tape']['net_aggressive_usd']/1e6:+.2f}m、买方占比 {wt['spot_orderflow']['ETH']['venues']['binance']['trade_tape']['buy_share']*100:.1f}%，盘口偏差 {wt['spot_orderflow']['ETH']['venues']['binance']['order_book']['0_5pct']['imbalance']*100:+.1f}%；SOL 末端主动流量仍有修复，但不是持续买盘证据。BTC/ETH 样本显示卖压更明显，标签化 CEX 钱包净流仍不可得，普通现货成交带不能冒充交易所净流。")
+    def tape_summary(asset_name: str) -> str:
+        venue = wt.get("spot_orderflow", {}).get(asset_name, {}).get("venues", {}).get("binance")
+        if not venue:
+            return f"{asset_name} 现货主动买卖与盘口数据不可得"
+        tape = venue["trade_tape"]
+        book = venue["order_book"]["0_5pct"]
+        return f"{asset_name} 主动净额 {tape['net_aggressive_usd']/1e6:+.2f}m、买方占比 {tape['buy_share']*100:.1f}%、盘口偏差 {book['imbalance']*100:+.1f}%"
+    paragraph(doc, f"本轮 {tape_summary('BTC')}；{tape_summary('ETH')}；SOL 末端主动流量仍有修复，但不是持续买盘证据。标签化 CEX 钱包净流仍不可得，普通现货成交带不能冒充交易所净流。")
 
     heading(doc, "衍生品与微观结构")
     table(doc, ["资产", "价格24h", "Funding", "OI notional", "OI 24h", "Taker x3", "结构判断"], [
