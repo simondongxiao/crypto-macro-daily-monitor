@@ -32,6 +32,7 @@ BINANCE_BASES = (
     "https://fapi2.binance.com",
     "https://fapi3.binance.com",
 )
+BYBIT_BASE = "https://api.bybit.com"
 
 
 def binance(path, **params):
@@ -42,6 +43,15 @@ def binance(path, **params):
         except requests.RequestException as error:
             last_error = error
     raise RuntimeError(f"Binance futures endpoints unavailable: {last_error}")
+
+
+def bybit(path, **params):
+    response = S.get(BYBIT_BASE + path, params=params, timeout=20)
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("retCode") != 0:
+        raise RuntimeError(f"Bybit request failed: {payload}")
+    return payload["result"]
 
 
 def yahoo(symbol):
@@ -124,7 +134,7 @@ def key_person_monitor(now):
     }
 
 
-def asset(symbol):
+def asset_binance(symbol):
     ticker = binance("/fapi/v1/ticker/24hr", symbol=symbol)
     premium = binance("/fapi/v1/premiumIndex", symbol=symbol)
     funding = binance("/fapi/v1/fundingRate", symbol=symbol, limit=1)[0]
@@ -150,11 +160,62 @@ def asset(symbol):
     }
 
 
+def bybit_klines(symbol, interval, limit):
+    rows = bybit("/v5/market/kline", category="linear", symbol=symbol, interval=interval, limit=min(limit, 1000))["list"]
+    rows = sorted(rows, key=lambda row: int(row[0]))
+    return [[int(row[0]), row[1], row[2], row[3], row[4], row[5], row[6]] for row in rows]
+
+
+def asset_bybit(symbol):
+    ticker = bybit("/v5/market/tickers", category="linear", symbol=symbol)["list"][0]
+    funding = bybit("/v5/market/funding/history", category="linear", symbol=symbol, limit=1)["list"]
+    oi = bybit("/v5/market/open-interest", category="linear", symbol=symbol, intervalTime="1d", limit=6)["list"]
+    ratio = bybit("/v5/market/account-ratio", category="linear", symbol=symbol, period="1h", limit=3)["list"]
+    mark = float(ticker.get("markPrice") or ticker["lastPrice"])
+    oi_rows = sorted(oi, key=lambda row: int(row["timestamp"]))
+    oi_values = [float(row["openInterest"]) * mark for row in oi_rows]
+    taker_values = []
+    for row in sorted(ratio, key=lambda row: int(row["timestamp"])):
+        buy = float(row.get("buyRatio") or 0.5)
+        sell = float(row.get("sellRatio") or 0.5)
+        taker_values.append(buy / sell if sell else 1.0)
+    if len(taker_values) < 3:
+        taker_values = [1.0, 1.0, 1.0]
+    return {
+        "mark": mark,
+        "change24": float(ticker.get("price24hPcnt") or 0) * 100,
+        "high24": float(ticker.get("highPrice24h") or mark),
+        "low24": float(ticker.get("lowPrice24h") or mark),
+        "funding": float(funding[0].get("fundingRate") or 0) * 100 if funding else 0.0,
+        "taker_last3": taker_values[-3:],
+        "oi_5d": [{"value": value} for value in oi_values],
+        "oi_last": oi_values[-1] if oi_values else 0.0,
+        "oi24_pct": (oi_values[-1] / oi_values[-2] - 1) * 100 if len(oi_values) >= 2 and oi_values[-2] else 0.0,
+        "klines": bybit_klines(symbol, "60", 121),
+        "klines15m": bybit_klines(symbol, "15", 32),
+        "klines4h": bybit_klines(symbol, "240", 1000),
+        "klines1d": bybit_klines(symbol, "D", 500),
+        "source": "BYBIT_PUBLIC_DERIVATIVES_FALLBACK",
+    }
+
+
+def asset(symbol):
+    try:
+        return asset_binance(symbol)
+    except Exception as error:
+        print(f"Binance unavailable for {symbol}; using Bybit public fallback: {error}")
+        return asset_bybit(symbol)
+
+
 def main():
     now = datetime.now(ZoneInfo("Asia/Shanghai"))
     symbols = {"BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT", "UNI": "UNIUSDT", "AVAX": "AVAXUSDT", "LINK": "LINKUSDT", "XRP": "XRPUSDT", "DOGE": "DOGEUSDT"}
     derivatives = {name: asset(symbol) for name, symbol in symbols.items()}
-    depth = binance("/fapi/v1/depth", symbol="BTCUSDT", limit=20)
+    try:
+        depth = binance("/fapi/v1/depth", symbol="BTCUSDT", limit=20)
+    except Exception:
+        orderbook = bybit("/v5/market/orderbook", category="linear", symbol="BTCUSDT", limit=50)
+        depth = {"bids": orderbook.get("b", []), "asks": orderbook.get("a", [])}
     stablecoins = get("https://stablecoins.llama.fi/stablecoins")
     whale_treasury_orderflow = collect_whale_treasury_orderflow(
         now,
