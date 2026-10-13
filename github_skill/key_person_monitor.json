@@ -1,0 +1,18 @@
+{
+  "version": "2026-10-02-v1",
+  "purpose": "Daily candidate monitor for crypto-relevant stance changes. Candidate headlines are not reportable view changes until an analyst validates the underlying source.",
+  "people": [
+    {"name": "Donald Trump", "group": "political/executive", "query": "Donald Trump crypto OR bitcoin OR stablecoin"},
+    {"name": "Cynthia Lummis", "group": "political/regulatory", "query": "Cynthia Lummis crypto OR bitcoin OR stablecoin"},
+    {"name": "Elizabeth Warren", "group": "political/regulatory", "query": "Elizabeth Warren crypto OR stablecoin"},
+    {"name": "Paul Atkins", "group": "regulatory", "query": "Paul Atkins SEC crypto OR tokenization"},
+    {"name": "Ray Dalio", "group": "macro allocator", "query": "Ray Dalio bitcoin OR crypto OR gold"},
+    {"name": "Larry Fink", "group": "asset management", "query": "Larry Fink bitcoin OR crypto OR tokenization"},
+    {"name": "Michael Saylor", "group": "corporate treasury", "query": "Michael Saylor bitcoin OR Strategy"},
+    {"name": "Elon Musk", "group": "business", "query": "Elon Musk bitcoin OR crypto OR Dogecoin"},
+    {"name": "Jamie Dimon", "group": "banking", "query": "Jamie Dimon bitcoin OR crypto OR stablecoin"},
+    {"name": "Brian Armstrong", "group": "crypto business", "query": "Brian Armstrong Coinbase crypto regulation OR bitcoin"},
+    {"name": "Vitalik Buterin", "group": "crypto-native", "query": "Vitalik Buterin Ethereum OR crypto"},
+    {"name": "Changpeng Zhao", "group": "crypto-native", "query": "Changpeng Zhao crypto OR BNB OR bitcoin"}
+  ]
+}
