@@ -14,8 +14,9 @@ from zoneinfo import ZoneInfo
 BJT = ZoneInfo("Asia/Shanghai")
 NOW = datetime.now(BJT)
 BUNDLE = Path(__file__).resolve().parents[1]
-REPORTS = BUNDLE / "reports"
-CONFIG = BUNDLE / "config" / "active_conditions.json"
+REPO_ROOT = BUNDLE.parent
+REPORTS = REPO_ROOT / "reports"
+CONFIG = REPO_ROOT / "config" / "active_conditions.json"
 REPORTS.mkdir(parents=True, exist_ok=True)
 CONFIG.parent.mkdir(parents=True, exist_ok=True)
 
