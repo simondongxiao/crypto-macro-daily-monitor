@@ -23,6 +23,13 @@ ASSETS = {
     "SOL": {"binance": "SOLUSDT", "okx": "SOL-USDT", "floor": 100_000},
 }
 STRATEGY_CIK = "0001050446"
+BINANCE_SPOT_BASES = (
+    "https://api.binance.com",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+    "https://api3.binance.com",
+    "https://api4.binance.com",
+)
 
 
 def session() -> requests.Session:
@@ -116,8 +123,18 @@ def summarize_book(bids: list[list[Any]], asks: list[list[Any]]) -> dict[str, An
 
 
 def binance_snapshot(s: requests.Session, symbol: str, floor: float) -> dict[str, Any]:
-    raw_trades = get_json(s, "https://api.binance.com/api/v3/aggTrades", symbol=symbol, limit=1000)
-    raw_book = get_json(s, "https://api.binance.com/api/v3/depth", symbol=symbol, limit=1000)
+    # GitHub-hosted runners can receive a transient 403/empty response from one
+    # Binance edge. Try the other public edges before falling back to OKX.
+    last_error: Exception | None = None
+    for base in BINANCE_SPOT_BASES:
+        try:
+            raw_trades = get_json(s, f"{base}/api/v3/aggTrades", symbol=symbol, limit=1000)
+            raw_book = get_json(s, f"{base}/api/v3/depth", symbol=symbol, limit=1000)
+            break
+        except Exception as exc:
+            last_error = exc
+    else:
+        raise RuntimeError(f"Binance spot edges unavailable: {last_error}")
     trades = [
         {
             "price": float(row["p"]),
