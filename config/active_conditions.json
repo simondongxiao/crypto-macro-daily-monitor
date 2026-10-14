@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-14",
+  "date": "2026-10-15",
   "assets": {
     "BTCUSDT": {
       "long_zone": [
@@ -7,7 +7,7 @@
         82804.98
       ],
       "short_zone": [],
-      "alerted_long": true,
+      "alerted_long": false,
       "alerted_short": false
     },
     "ETHUSDT": {
