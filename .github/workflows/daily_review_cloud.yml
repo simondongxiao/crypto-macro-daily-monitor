@@ -42,11 +42,6 @@ jobs:
       - name: Fetch data and build Word review
         run: $GENERATOR_COMMAND
 
-      - name: Notify Feishu
-        run: |
-          report=$(find reports -maxdepth 1 -name 'crypto_macro_daily_*.docx' -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
-          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/"
-
       - name: Commit report and active conditions
         run: |
           git config user.name "github-actions[bot]"
@@ -75,3 +70,8 @@ jobs:
 
       - name: Deploy HTML report to Pages
         uses: actions/deploy-pages@v4
+
+      - name: Notify Feishu
+        run: |
+          report=$(find reports -maxdepth 1 -name 'crypto_macro_daily_*.docx' -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
+          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/"
