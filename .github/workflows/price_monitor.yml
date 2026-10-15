@@ -49,6 +49,8 @@ jobs:
 
       - name: Commit alert state if changed
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- config/active_conditions.json; then
             echo "No alert state change."
@@ -67,5 +69,17 @@ jobs:
             git rebase origin/main
             sleep $((attempt * 5))
           done
-          echo "Unable to persist price alert state after 5 attempts."
+          echo "Git push failed; attempting GitHub Contents API state persistence."
+          content=$(base64 -w0 config/active_conditions.json)
+          for attempt in 1 2 3; do
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/config/active_conditions.json?ref=main" --jq '.sha' 2>/dev/null || true)
+            if [ -n "$sha" ]; then
+              if gh api "repos/$GITHUB_REPOSITORY/contents/config/active_conditions.json" --method PUT -f message="chore: persist crypto price alert state (api fallback)" -f content="$content" -f branch=main -f sha="$sha" >/dev/null; then
+                echo "Alert state persisted through GitHub Contents API."
+                exit 0
+              fi
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "Unable to persist price alert state after git and API retries."
           exit 1
