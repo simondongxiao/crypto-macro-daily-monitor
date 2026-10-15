@@ -3,10 +3,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tempfile
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 from docx import Document
+
+BJT = ZoneInfo("Asia/Shanghai")
 
 
 def extract_summary(path: Path) -> str:
@@ -26,11 +31,24 @@ def main() -> None:
     parser.add_argument("--report", required=True)
     parser.add_argument("--run-url", default="")
     parser.add_argument("--html-url", default="")
+    parser.add_argument("--business-date", default=datetime.now(BJT).date().isoformat())
+    parser.add_argument("--dedupe-path", default="audit/feishu_daily.json")
     args = parser.parse_args()
     if not args.webhook:
         raise SystemExit("FEISHU_WEBHOOK is required")
 
     report = Path(args.report)
+    dedupe_path = Path(args.dedupe_path)
+    if dedupe_path.name == "feishu_daily.json":
+        dedupe_path = dedupe_path.with_name(f"feishu_daily_{args.business_date}.json")
+    if dedupe_path.exists():
+        try:
+            previous = json.loads(dedupe_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previous = {}
+        if previous.get("status") == "ACCEPTED":
+            print(f"Feishu notification already accepted for business_date={args.business_date}; duplicate skipped")
+            return
     text = (
         f"Crypto日报已生成\n"
         f"文件：{report.name}\n\n"
@@ -53,6 +71,12 @@ def main() -> None:
         raise SystemExit(f"Feishu webhook response missing code: {json.dumps(body, ensure_ascii=False)}")
     if body["code"] != 0:
         raise SystemExit(f"Feishu webhook rejected request: {json.dumps(body, ensure_ascii=False)}")
+    dedupe_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=dedupe_path.parent, delete=False) as handle:
+        json.dump({"business_date": args.business_date, "status": "ACCEPTED", "code": body["code"], "accepted_at_bjt": datetime.now(BJT).isoformat(), "report": report.name}, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+        temporary = Path(handle.name)
+    os.replace(temporary, dedupe_path)
     print(f"Feishu notification accepted: code={body['code']}")
 
 
