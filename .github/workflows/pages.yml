@@ -1,11 +1,8 @@
 name: Publish Crypto Daily HTML
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "reports/*.html"
-      - "reports/index.html"
+  # Automatic publication is performed by daily_review_cloud.yml after the
+  # report and HTML are generated. Keep this as an explicit recovery path.
   workflow_dispatch:
 
 permissions:
