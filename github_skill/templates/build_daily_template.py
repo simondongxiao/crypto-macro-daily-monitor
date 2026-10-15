@@ -24,24 +24,38 @@ from docx.shared import Inches, Pt, RGBColor
 
 BJT = ZoneInfo("Asia/Shanghai")
 NOW = datetime.now(BJT)
-PROJECT = Path(r"D:\codex\技能项目\crypto_macro_daily")
-OUT_ROOT = Path(r"D:\codex\crypto_macro_daily")
+PROJECT = Path(os.environ.get("CRYPTO_GITHUB_ROOT", Path(__file__).resolve().parents[1]))
+OUT_ROOT = Path(os.environ.get("CRYPTO_REPORT_ROOT", PROJECT / "reports"))
 OUT_ROOT.mkdir(parents=True, exist_ok=True)
-DATA_PATH = PROJECT / "live_market_detail_20261013.json"
-SUPPLEMENT_PATH = PROJECT / "research_supplement_20261013_0811.json"
-VIEWS_PATH = PROJECT / "verified_updates_20261013_0811.json"
-WHALE_PATH = PROJECT / "whale_treasury_orderflow_20261011_latest.json"
+
+
+def resolve_input(env_name: str, pattern: str) -> Path:
+    configured = os.environ.get(env_name)
+    if configured:
+        return PROJECT / configured
+    candidates = sorted(PROJECT.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True)
+    if not candidates:
+        raise FileNotFoundError(f"No input file for {env_name}: {pattern}")
+    return candidates[0]
+
+
+DATA_PATH = resolve_input("CRYPTO_DATA_FILE", "live_market_detail_*.json")
+SUPPLEMENT_PATH = resolve_input("CRYPTO_SUPPLEMENT_FILE", "research_supplement_*.json")
+VIEWS_PATH = resolve_input("CRYPTO_VIEWS_FILE", "verified_updates_*.json")
+WHALE_PATH = PROJECT / os.environ["CRYPTO_WHALE_FILE"] if os.environ.get("CRYPTO_WHALE_FILE") else None
 D = json.loads(DATA_PATH.read_text(encoding="utf-8"))
 S = json.loads(SUPPLEMENT_PATH.read_text(encoding="utf-8"))
 V = json.loads(VIEWS_PATH.read_text(encoding="utf-8"))
-if WHALE_PATH.exists():
+if WHALE_PATH and WHALE_PATH.exists() and "whale_treasury_orderflow" not in D:
     D["whale_treasury_orderflow"] = json.loads(WHALE_PATH.read_text(encoding="utf-8"))
-TAG = "2026-10-13_0811BJT"
+REPORT_DATE = NOW.strftime("%Y-%m-%d")
+DAY_COMPACT = NOW.strftime("%Y%m%d")
+TAG = os.environ.get("CRYPTO_REPORT_TAG", NOW.strftime("%Y-%m-%d_%H%M%SBJT"))
 OUT = OUT_ROOT / f"crypto_macro_daily_{TAG}.docx"
 ASSET_DIR = OUT_ROOT / f"_assets_{TAG}"
 ASSET_DIR.mkdir(parents=True, exist_ok=True)
 
-sys.path.insert(0, r"D:\codex\skills\crypto-macro-daily-review\scripts")
+sys.path.insert(0, str(PROJECT / "scripts"))
 from snapshot_planner import classify_htf, execution_state
 from turning_point_overlay import analyze as analyze_turning_points
 
@@ -446,14 +460,14 @@ def make_document() -> Path:
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     subtitle.paragraph_format.space_after = Pt(8)
-    configure_run(subtitle.add_run(f"2026-10-13 | 市场快照 {D['retrieved_bjt'][11:16]} BJT | 规则：snapshot-regime-router-v1 + dynamic-rr-v1 + turning-point-overlay-shadow-v1"), size=8.4, color=RGBColor(90, 90, 90))
+    configure_run(subtitle.add_run(f"{REPORT_DATE} | 市场快照 {D['retrieved_bjt'][11:16]} BJT | 规则：snapshot-regime-router-v1 + dynamic-rr-v1 + turning-point-overlay-shadow-v1"), size=8.4, color=RGBColor(90, 90, 90))
 
     heading(doc, "数据快照说明")
-    paragraph(doc, f"本报告使用 {D['retrieved_bjt']} 的 Binance 同轮行情、衍生品、Deribit 期权、Binance/OKX 现货成交带与盘口快照；ETF BTC 最新公开值到 2026-10-07，ETH/SOL 当日值未完整取得，宏观、催化剂与大佬观点核验截止 {D['retrieved_bjt'][:10]} {D['retrieved_bjt'][11:16]} BJT。条件卡只在写明的有效期内成立，不代表全天自动监控。")
+    paragraph(doc, f"本报告使用 {D['retrieved_bjt']} 的 Binance 同轮行情、衍生品、Deribit 期权、Binance/OKX 现货成交带与盘口快照；ETF 数据以本次输入中最新可核验公开值为准，ETH/SOL 当日值可能不完整，宏观、催化剂与大佬观点核验截止 {D['retrieved_bjt'][:10]} {D['retrieved_bjt'][11:16]} BJT。条件卡只在写明的有效期内成立，不代表全天自动监控。")
 
     heading(doc, "今日结论")
     btc_mark = D["derivatives"]["BTC"]["mark"]
-    paragraph(doc, f"当前价 {btc_mark:,.0f} 位于 POC {BTC_POC:,.0f} 上方、接近价值区上半部，不直接追多或追空；今天下沿多头路径因 POC 过近、TP1 净R:R不足而 INVALID，不执行。唯一保留的条件路径是上方 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高受阻后做空。条件卡有效至 2026-10-13 20:00 BJT，或结构/事件先失效。", size=11.0, bold=True, after=6)
+    paragraph(doc, f"当前价 {btc_mark:,.0f} 位于 POC {BTC_POC:,.0f} 上方、接近价值区上半部，不直接追多或追空；今天下沿多头路径因 POC 过近、TP1 净R:R不足而 INVALID，不执行。唯一保留的条件路径是上方 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高受阻后做空。条件卡有效至 {REPORT_DATE} 20:00 BJT，或结构/事件先失效。", size=11.0, bold=True, after=6)
     heading(doc, "中线趋势与阶段交易", 3)
     table(doc, ["资产", "中线趋势", "当前阶段", "阶段交易优先级", "推翻条件"], [
         ["BTC", TRENDS["BTC"]["label"], "日线低于20D但高于60D / 4H区间 / 现价位于价值区中上部", f"下沿多头 INVALID（POC过近）；只保留上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 受阻做空", f"4H重新形成明确趋势，或有效脱离 {BTC_VAL:,.0f}-{BTC_VAH:,.0f} 价值区"],
@@ -465,7 +479,7 @@ def make_document() -> Path:
     heading(doc, "今日条件式交易预案", 3)
     table(doc, ["优先级", "品种/方向", "If-Then 触发", "Entry / Max", "SL", "TP1 / TP2", "净R:R", "到期/取消"], [
         ["1", "BTC 多（S1/S5）INVALID", f"下沿 {LONG_ENTRY_LO:,.0f}-{LONG_MAX:,.0f} 即使扫低收回也不执行：POC {BTC_POC:,.0f} 距离过近，TP1净R:R不足", f"{LONG_ENTRY_LO:,.0f}-{LONG_MAX:,.0f} / {LONG_MAX:,.0f}", f"{LONG_STOP:,.0f}", f"{LONG_TP1:,.0f} / {LONG_TP2:,.0f}", f"TP1 1:{LONG_RR1:.2f}；加权 1:{LONG_WEIGHTED_RR:.2f}", "本轮取消；等待价值区重算"],
-        ["2", "BTC 空（S5上沿受阻回落）", f"若价格进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f}，15m/30m出现冲高失败、LH并重新跌回 VAH {BTC_VAH:,.0f} 下方，且 Taker<0.90或OI继续增加而价格不再上行，则执行", f"{SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} / {SHORT_MAX:,.0f}", f"{SHORT_STOP:,.0f}", f"{SHORT_TP1:,.0f} / {SHORT_TP2:,.0f}", f"TP1 1:{SHORT_RR1:.2f}；加权 1:{SHORT_WEIGHTED_RR:.2f}", "2026-10-13 20:00；重新站稳Max Entry或价值区重算即取消"],
+        ["2", "BTC 空（S5上沿受阻回落）", f"若价格进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f}，15m/30m出现冲高失败、LH并重新跌回 VAH {BTC_VAH:,.0f} 下方，且 Taker<0.90或OI继续增加而价格不再上行，则执行", f"{SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} / {SHORT_MAX:,.0f}", f"{SHORT_STOP:,.0f}", f"{SHORT_TP1:,.0f} / {SHORT_TP2:,.0f}", f"TP1 1:{SHORT_RR1:.2f}；加权 1:{SHORT_WEIGHTED_RR:.2f}", f"{REPORT_DATE} 20:00；重新站稳Max Entry或价值区重算即取消"],
     ], font=6.2, first_col_bold=True)
     paragraph(doc, f"BTC 当前在 POC {BTC_POC:,.0f} 附近，POC 可以理解为最近成交最拥挤的中轴，不是追单位置。今天下沿多头卡因第一阻力过近被取消；只有上方 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高失败、跌回 VAH 下方并形成 LH，才考虑做空。每张有效卡最多0.10%账户风险，只是亏损上限，不是必须用满的目标仓位。", size=10.0, after=6)
 
@@ -718,22 +732,22 @@ def make_document() -> Path:
         ["价格/衍生品", "Binance USDⓈ-M direct API", D["retrieved_bjt"], "SUCCESS", "VERIFIED"],
         ["现货大单/盘口", "Binance Spot / OKX fallback", wt["retrieved_bjt"], wt["status"], "VERIFIED per successful venue"],
         ["宏观/事件", "Federal Reserve, BLS, BEA; Yahoo cross-asset", f"{D['retrieved_bjt'][:10]} {D['retrieved_bjt'][11:16]} BJT", "SUCCESS", "VERIFIED / latest market close"],
-        ["BTC/ETH/SOL ETF", "CryptoMeter / Alpha Finance; Farside fallback", "published through 2026-10-07 for BTC; ETH/SOL partial", "PARTIAL", "SECONDARY"],
+        ["BTC/ETH/SOL ETF", "CryptoMeter / Alpha Finance; Farside fallback", "latest published values in current input; ETH/SOL partial", "PARTIAL", "SECONDARY"],
         ["稳定币", "DefiLlama stablecoin API", D["retrieved_bjt"], "SUCCESS", "SECONDARY"],
         ["财库", "SEC EDGAR Strategy 8-K", treasury["filing_date"], "SUCCESS", "VERIFIED"],
         ["链上大额候选", "mempool.space recent tx", wt["retrieved_bjt"], "SUCCESS", "PROXY / unlabeled"],
         ["标签化 CEX 钱包净流", "Public exchange API check / no authenticated labelled provider", D["retrieved_bjt"], "UNAVAILABLE", "UNAVAILABLE"],
         ["期权", "Deribit public API; local max-pain derivation", D["retrieved_bjt"], "SUCCESS", "VERIFIED + DERIVED"],
-        ["链上 realized/STH cost", "Public-source scan", "2026-10-13", "UNAVAILABLE", "UNAVAILABLE"],
+        ["链上 realized/STH cost", "Public-source scan", REPORT_DATE, "UNAVAILABLE", "UNAVAILABLE"],
         ["Volume Profile", "Binance 1h OHLCV typical-price allocation", D["retrieved_bjt"], "SUCCESS", "PROXY"],
-        ["真实清算热力图", "CoinGlass/Hyblock lawful public access", "2026-10-13", "UNAVAILABLE", "UNAVAILABLE; stop proxy shown separately"],
-        ["山寨基本面/解锁", "DefiLlama chain/unlock pages", "2026-10-13", "PARTIAL; AVAX only", "SECONDARY"],
+        ["真实清算热力图", "CoinGlass/Hyblock lawful public access", REPORT_DATE, "UNAVAILABLE", "UNAVAILABLE; stop proxy shown separately"],
+        ["山寨基本面/解锁", "DefiLlama chain/unlock pages", REPORT_DATE, "PARTIAL; AVAX only", "SECONDARY"],
         ["大佬观点", "Google News candidate monitor + SEC/Senate/White House/issuer checks", V["cutoff_bjt"], V["status"], "VERIFIED where promoted"],
-        ["未来催化", "Federal Reserve/BLS/BEA/Senate/DefiLlama calendars", "2026-10-13", "SUCCESS", "VERIFIED / SECONDARY unlock"],
+        ["未来催化", "Federal Reserve/BLS/BEA/Senate/DefiLlama calendars", REPORT_DATE, "SUCCESS", "VERIFIED / SECONDARY unlock"],
     ], font=6.4)
     paragraph(doc, "来源：Binance/OKX、Deribit、BLS、Fed、BEA、Farside、SEC EDGAR、mempool.space、DefiLlama；代理数据均已在正文单列。", size=8.8, after=0)
 
-    doc.core_properties.title = "加密宏观每日复盘 - 2026-10-13"
+    doc.core_properties.title = f"加密宏观每日复盘 - {REPORT_DATE}"
     doc.core_properties.subject = "BTC/ETH/SOL 宏观、衍生品、交易台与风险复盘"
     doc.core_properties.author = "Codex"
     doc.save(OUT)
@@ -750,7 +764,7 @@ def write_state_and_ledger(report_path: Path) -> None:
         "regime": "HTF_RANGE_RANGE_MIDDLE_UPPER_HALF",
         "bias": "MEDIUM_TERM_RANGE_CURRENT_UPPER_HALF",
         "major_levels": {asset: {key: P[asset][key] for key in ("val", "poc", "vah", "low", "high")} for asset in ("BTC", "ETH", "SOL")},
-        "active_candidate": "20261013-0811-btc-s5-upper-rejection",
+        "active_candidate": f"{DAY_COMPACT}-{TAG[-8:]}-btc-s5-upper-rejection",
         "now_action": "WAIT_NOW",
         "next_valid_plan": "ARMED_SHORT_ONLY",
         "data_quality": "B",
@@ -758,7 +772,7 @@ def write_state_and_ledger(report_path: Path) -> None:
     }
     (root / "daily_market_state.json").write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     ledger = root / "model_execution_ledger.jsonl"
-    setup_id = "20261013-0811-btc-s5-upper-rejection"
+    setup_id = f"{DAY_COMPACT}-{TAG[-8:]}-btc-s5-upper-rejection"
     existing = ledger.read_text(encoding="utf-8") if ledger.exists() else ""
     if f'"setup_id": "{setup_id}"' not in existing:
         event = {
@@ -772,10 +786,10 @@ def write_state_and_ledger(report_path: Path) -> None:
             "net_rr_obstacle": round(SHORT_RR1, 3), "net_rr_tp2": round(SHORT_RR2, 3), "weighted_net_rr": round(SHORT_WEIGHTED_RR, 3),
             "estimated_fee_rate": 0.0008, "estimated_slippage_rate": 0.0004,
             "model_allowed_risk_pct": 0.10, "risk_mode": "BOOTSTRAP_CALIBRATION", "correlation_cluster": "BTC_CORE",
-            "entry_expiry": "2026-10-13T20:00:00+08:00", "data_quality": "B", "event_risk": "MEDIUM",
+            "entry_expiry": f"{REPORT_DATE}T20:00:00+08:00", "data_quality": "B", "event_risk": "MEDIUM",
             "trigger": f"Short only: rebound into {SHORT_ENTRY_LO:.0f}-{SHORT_MAX:.0f}, fail back below VAH with lower high and weak Taker. Lower-edge long is invalid because TP1 net R:R is below threshold.",
             "flow_confirmation_status": "REQUIRED_FOR_TRIGGER", "flow_mode": "S5_RANGE_EDGE_SWEEP_RECLAIM_OR_REJECTION",
-            "structural_zone_id": "BTC-5D-VALUE-20261013-0811", "structural_zone_status": "VALID", "attempt_id": "attempt01",
+            "structural_zone_id": f"BTC-5D-VALUE-{DAY_COMPACT}-{TAG[-8:]}", "structural_zone_status": "VALID", "attempt_id": "attempt01",
             "attempt_status": "NOT_STARTED", "fresh_trigger_id": None, "attempt_count": 0, "rearm_eligible": True,
             "counterfactual_status": "NOT_APPLICABLE"
         }
