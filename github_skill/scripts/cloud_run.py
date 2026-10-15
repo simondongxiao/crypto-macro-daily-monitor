@@ -17,8 +17,10 @@ BUNDLE = Path(__file__).resolve().parents[1]
 REPO_ROOT = BUNDLE.parent
 REPORTS = REPO_ROOT / "reports"
 CONFIG = REPO_ROOT / "config" / "active_conditions.json"
+AUDIT = REPO_ROOT / "audit"
 REPORTS.mkdir(parents=True, exist_ok=True)
 CONFIG.parent.mkdir(parents=True, exist_ok=True)
+AUDIT.mkdir(parents=True, exist_ok=True)
 
 
 def run_fetch() -> Path:
@@ -149,7 +151,23 @@ def main() -> None:
     )
     shutil.copyfile(html_path, REPORTS / "index.html")
     update_conditions(data_path)
-    print(json.dumps({"report": str(report), "html": str(html_path), "conditions": str(CONFIG)}, ensure_ascii=False))
+    data = json.loads(data_path.read_text(encoding="utf-8"))
+    audit = {
+        "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+        "retrieved_bjt": data.get("retrieved_bjt"),
+        "report_date": NOW.date().isoformat(),
+        "generated_at_bjt": NOW.isoformat(),
+        "report": str(report.relative_to(REPO_ROOT)),
+        "html": str(html_path.relative_to(REPO_ROOT)),
+        "index_html": "reports/index.html",
+        "active_conditions": str(CONFIG.relative_to(REPO_ROOT)),
+        "generation_status": "SUCCESS",
+        "data_sources": data.get("source_status", data.get("sources")),
+    }
+    (AUDIT / f"daily_review_{audit['run_id']}.json").write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    print(json.dumps({"report": str(report), "html": str(html_path), "conditions": str(CONFIG), "audit": str(AUDIT)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
