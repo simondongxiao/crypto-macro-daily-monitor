@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: crypto-daily-review-cloud
+  # This workflow and price_monitor.yml both write main/config state.
+  group: crypto-main-writer
   cancel-in-progress: false
 
 permissions:
@@ -46,7 +47,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/*.docx reports/*.html reports/index.html config/active_conditions.json
+          git add reports/*.docx reports/*.html reports/index.html config/active_conditions.json audit/*.json
           git diff --cached --quiet || git commit -m "chore: publish crypto daily review $(date -u +%F)"
           for attempt in 1 2 3 4 5; do
             if git push; then
