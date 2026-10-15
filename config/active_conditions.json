@@ -3,8 +3,8 @@
   "assets": {
     "BTCUSDT": {
       "long_zone": [
-        82548.71,
-        82698.71
+        81896.75,
+        82046.75
       ],
       "short_zone": [],
       "alerted_long": false,

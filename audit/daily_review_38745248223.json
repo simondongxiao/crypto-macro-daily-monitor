@@ -1,0 +1,12 @@
+{
+  "run_id": "38745248223",
+  "retrieved_bjt": "2026-10-15T21:44:35.791098+08:00",
+  "report_date": "2026-10-15",
+  "generated_at_bjt": "2026-10-15T21:44:35.237202+08:00",
+  "report": "reports/crypto_macro_daily_2026-10-15_2144BJT.docx",
+  "html": "reports/crypto_macro_daily_2026-10-15_2144BJT.html",
+  "index_html": "reports/index.html",
+  "active_conditions": "config/active_conditions.json",
+  "generation_status": "SUCCESS",
+  "data_sources": null
+}
