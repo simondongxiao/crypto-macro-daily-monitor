@@ -144,6 +144,7 @@ def main() -> None:
     evaluations: list[dict[str, Any]] = []
     notifications: list[dict[str, Any]] = []
     stale = payload.get("date") != today
+    notification_failed = False
 
     print(f"MONITOR_RUN query_time_bjt={now.isoformat()} config_date={payload.get('date')} today={today}")
     print(f"PRICE_SOURCE source={price_source}")
@@ -178,7 +179,9 @@ def main() -> None:
                 continue
             if not args.webhook:
                 notifications.append({"symbol": symbol, "side": side, "status": "NOTIFICATION_FAILED", "reason": "WEBHOOK_MISSING"})
-                raise SystemExit("FEISHU_WEBHOOK_URL is required when an alert is triggered")
+                notification_failed = True
+                print(f"NOTIFICATION_FAILED {symbol} {side} reason=WEBHOOK_MISSING")
+                continue
             try:
                 body = send_feishu(session, args.webhook, symbol, side, prices[symbol], zone)
                 item[flag] = True
@@ -189,12 +192,14 @@ def main() -> None:
             except Exception as error:
                 notifications.append({"symbol": symbol, "side": side, "status": "NOTIFICATION_FAILED", "reason": str(error)[:300]})
                 print(f"NOTIFICATION_FAILED {symbol} {side} reason={error}")
-                raise
+                notification_failed = True
 
-    status = "STALE_CONFIG" if stale else "ALERT_SENT" if changed else "NO_TRIGGER"
+    status = "STALE_CONFIG" if stale else "NOTIFICATION_FAILED" if notification_failed else "ALERT_SENT" if changed else "NO_TRIGGER"
     record = {"query_time_bjt": now.isoformat(), "config_date": payload.get("date"), "status": status, "price_source": price_source, "source_failures": source_failures, "prices": prices, "evaluations": evaluations, "notifications": notifications}
     write_audit(audit_path, record)
     print(f"MONITOR_RESULT status={status} audit={audit_path}")
+    if notification_failed:
+        raise SystemExit("One or more triggered alerts could not be accepted by Feishu")
 
 
 if __name__ == "__main__":
