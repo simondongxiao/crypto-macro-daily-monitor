@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 BJT = ZoneInfo("Asia/Shanghai")
 NOW = datetime.now(BJT)
+BUSINESS_DATE = NOW.date().isoformat()
 BUNDLE = Path(__file__).resolve().parents[1]
 REPO_ROOT = BUNDLE.parent
 REPORTS = REPO_ROOT / "reports"
@@ -34,7 +35,7 @@ def run_fetch() -> Path:
 def make_research_inputs(data_path: Path) -> tuple[Path, Path]:
     data = json.loads(data_path.read_text(encoding="utf-8"))
     stamp = data.get("retrieved_bjt", NOW.isoformat())
-    tag = NOW.strftime("%H%M")
+    tag = NOW.strftime("%H%M%S")
     supplement = json.loads((BUNDLE / "templates" / "research_supplement_template.json").read_text(encoding="utf-8"))
     supplement["snapshot_bjt"] = stamp
     supplement["options_derived"] = {
@@ -66,32 +67,25 @@ def make_research_inputs(data_path: Path) -> tuple[Path, Path]:
 
 def build_report(data_path: Path, supplement_path: Path, views_path: Path) -> Path:
     template = (BUNDLE / "templates" / "build_daily_template.py").read_text(encoding="utf-8")
-    today_iso = NOW.strftime("%Y-%m-%d")
-    today_compact = NOW.strftime("%Y%m%d")
-    tag = NOW.strftime("%H%M")
-    replacements = {
-        'PROJECT = Path(r"D:\\codex\\技能项目\\crypto_macro_daily")': 'PROJECT = Path(os.environ["CRYPTO_GITHUB_ROOT"])',
-        'OUT_ROOT = Path(r"D:\\codex\\crypto_macro_daily")': 'OUT_ROOT = Path(os.environ["CRYPTO_REPORT_ROOT"])',
-        'sys.path.insert(0, r"D:\\codex\\skills\\crypto-macro-daily-review\\scripts")': 'sys.path.insert(0, str(PROJECT / "scripts"))',
-        "live_market_detail_20261013.json": data_path.name,
-        "research_supplement_20261013_0811.json": supplement_path.name,
-        "verified_updates_20261013_0811.json": views_path.name,
-        "2026-10-13": today_iso,
-        "20261013": today_compact,
-        "0811": tag,
-    }
-    for old, new in replacements.items():
-        template = template.replace(old, new)
-    generated = BUNDLE / f"_build_daily_{today_compact}_{tag}.py"
+    run_id = os.environ.get("GITHUB_RUN_ID", "local")
+    tag = NOW.strftime("%Y-%m-%d_%H%M%SBJT")
+    candidate = REPORTS / f"crypto_macro_daily_{tag}.docx"
+    if candidate.exists():
+        tag = f"{NOW:%Y-%m-%d_%H%M%SBJT}_r{run_id}"
+    generated = BUNDLE / f"_build_daily_{NOW:%Y%m%d}_{NOW:%H%M%S}_{run_id}.py"
     generated.write_text(template, encoding="utf-8")
     env = os.environ.copy()
     env["CRYPTO_GITHUB_ROOT"] = str(BUNDLE)
     env["CRYPTO_REPORT_ROOT"] = str(REPORTS)
+    env["CRYPTO_DATA_FILE"] = data_path.name
+    env["CRYPTO_SUPPLEMENT_FILE"] = supplement_path.name
+    env["CRYPTO_VIEWS_FILE"] = views_path.name
+    env["CRYPTO_REPORT_TAG"] = tag
     subprocess.run([sys.executable, str(generated)], cwd=BUNDLE, env=env, check=True)
-    reports = sorted(REPORTS.glob("crypto_macro_daily_*.docx"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not reports:
-        raise FileNotFoundError("No Word report generated")
-    return reports[0]
+    report = REPORTS / f"crypto_macro_daily_{tag}.docx"
+    if not report.exists():
+        raise FileNotFoundError(report)
+    return report
 
 
 def profile(candles: list[list[object]]) -> dict[str, float]:
@@ -123,6 +117,14 @@ def rr(entry: float, stop: float, target: float, side: str) -> float:
 
 def update_conditions(data_path: Path) -> None:
     data = json.loads(data_path.read_text(encoding="utf-8"))
+    previous: dict[str, object] = {}
+    if CONFIG.exists():
+        try:
+            previous = json.loads(CONFIG.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previous = {}
+    same_business_date = previous.get("date") == BUSINESS_DATE
+    previous_assets = previous.get("assets", {}) if isinstance(previous.get("assets", {}), dict) else {}
     assets: dict[str, dict[str, object]] = {}
     for symbol, asset in (("BTCUSDT", "BTC"), ("ETHUSDT", "ETH"), ("SOLUSDT", "SOL")):
         p = profile(data["derivatives"][asset]["klines"])
@@ -130,16 +132,51 @@ def update_conditions(data_path: Path) -> None:
         short_max, short_stop = p["vah"] + 80, p["vah"] + 500
         long_ok = rr(long_max, long_stop, p["poc"], "long") >= 1.0 and (0.4 * rr(long_max, long_stop, p["poc"], "long") + 0.6 * rr(long_max, long_stop, p["vah"], "long")) >= 1.3
         short_ok = rr(short_max, short_stop, p["poc"], "short") >= 1.0 and (0.4 * rr(short_max, short_stop, p["poc"], "short") + 0.6 * rr(short_max, short_stop, p["val"], "short")) >= 1.3
+        old = previous_assets.get(symbol, {}) if isinstance(previous_assets.get(symbol, {}), dict) else {}
+        long_zone = [round(p["val"] - 100, 2), round(long_max, 2)] if long_ok else []
+        short_zone = [round(p["vah"] - 100, 2), round(short_max, 2)] if short_ok else []
         assets[symbol] = {
-            "long_zone": [round(p["val"] - 100, 2), round(long_max, 2)] if long_ok else [],
-            "short_zone": [round(p["vah"] - 100, 2), round(short_max, 2)] if short_ok else [],
-            "alerted_long": False,
-            "alerted_short": False,
+            "long_zone": long_zone,
+            "short_zone": short_zone,
+            "alerted_long": bool(same_business_date and old.get("long_zone") == long_zone and old.get("alerted_long", False)),
+            "alerted_short": bool(same_business_date and old.get("short_zone") == short_zone and old.get("alerted_short", False)),
         }
-    CONFIG.write_text(json.dumps({"date": NOW.strftime("%Y-%m-%d"), "assets": assets}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    sent_alerts = previous.get("sent_alerts", {}) if same_business_date and isinstance(previous.get("sent_alerts", {}), dict) else {}
+    CONFIG.write_text(json.dumps({"date": BUSINESS_DATE, "assets": assets, "sent_alerts": sent_alerts}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def write_audit(record: dict[str, object]) -> None:
+    run_id = str(record.get("run_id", "local"))
+    (AUDIT / f"daily_review_{run_id}.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def existing_success_for_business_date() -> dict[str, object] | None:
+    canonical = AUDIT / f"daily_review_{BUSINESS_DATE}.json"
+    if not canonical.exists():
+        return None
+    try:
+        record = json.loads(canonical.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return record if record.get("generation_status") == "SUCCESS" else None
 
 
 def main() -> None:
+    prior = existing_success_for_business_date()
+    if prior and os.environ.get("ALLOW_DAILY_REBUILD") != "1":
+        record = {
+            "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+            "report_date": BUSINESS_DATE,
+            "generated_at_bjt": NOW.isoformat(),
+            "generation_status": "DUPLICATE_SKIP",
+            "reused_report": prior.get("report"),
+            "reused_html": prior.get("html"),
+            "note": "A successful report already exists for this business date; no historical report was overwritten.",
+            "data_sources": prior.get("data_sources"),
+        }
+        write_audit(record)
+        print(json.dumps(record, ensure_ascii=False))
+        return
     data_path = run_fetch()
     supplement_path, views_path = make_research_inputs(data_path)
     report = build_report(data_path, supplement_path, views_path)
@@ -155,18 +192,17 @@ def main() -> None:
     audit = {
         "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
         "retrieved_bjt": data.get("retrieved_bjt"),
-        "report_date": NOW.date().isoformat(),
+        "report_date": BUSINESS_DATE,
         "generated_at_bjt": NOW.isoformat(),
         "report": str(report.relative_to(REPO_ROOT)),
         "html": str(html_path.relative_to(REPO_ROOT)),
         "index_html": "reports/index.html",
         "active_conditions": str(CONFIG.relative_to(REPO_ROOT)),
         "generation_status": "SUCCESS",
-        "data_sources": data.get("source_status", data.get("sources")),
+        "data_sources": data.get("data_source_audit"),
     }
-    (AUDIT / f"daily_review_{audit['run_id']}.json").write_text(
-        json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    write_audit(audit)
+    (AUDIT / f"daily_review_{BUSINESS_DATE}.json").write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"report": str(report), "html": str(html_path), "conditions": str(CONFIG), "audit": str(AUDIT)}, ensure_ascii=False))
 
 
