@@ -10,7 +10,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: crypto-price-monitor
+  # The monitor writes alert flags to main. Serialize it with the daily writer.
+  group: crypto-main-writer
   cancel-in-progress: false
 
 jobs:
@@ -37,6 +38,15 @@ jobs:
           ACTIVE_CONDITIONS_PATH: config/active_conditions.json
         run: python scripts/price_monitor.py
 
+      - name: Upload monitor audit log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: price-monitor-${{ github.run_id }}
+          path: monitor_logs/*.jsonl
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Commit alert state if changed
         shell: bash
         run: |
@@ -48,4 +58,14 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add config/active_conditions.json
           git commit -m "chore: persist crypto price alert state"
-          git push
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push attempt $attempt failed; refreshing origin/main before retry."
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * 5))
+          done
+          echo "Unable to persist price alert state after 5 attempts."
+          exit 1
