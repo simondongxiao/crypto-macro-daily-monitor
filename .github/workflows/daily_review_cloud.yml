@@ -75,4 +75,48 @@ jobs:
       - name: Notify Feishu
         run: |
           report=$(find reports -maxdepth 1 -name 'crypto_macro_daily_*.docx' -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
-          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/"
+          business_date=$(TZ=Asia/Shanghai date +%F)
+          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --business-date "$business_date" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/"
+
+      - name: Persist Feishu notification dedupe state
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git status --short -- audit/feishu_daily_*.json | grep -q .; then
+            echo "No new Feishu notification state."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/feishu_daily_*.json
+          git commit -m "chore: persist crypto daily notification state"
+          for attempt in 1 2 3 4 5; do
+            if git push; then exit 0; fi
+            echo "Notification state push attempt $attempt failed; refreshing origin/main."
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * 5))
+          done
+          echo "Git push failed; attempting GitHub Contents API state persistence."
+          business_date=$(TZ=Asia/Shanghai date +%F)
+          path="audit/feishu_daily_${business_date}.json"
+          content=$(base64 -w0 "$path")
+          for attempt in 1 2 3; do
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=main" --jq '.sha' 2>/dev/null || true)
+            if [ -n "$sha" ]; then
+              if gh api "repos/$GITHUB_REPOSITORY/contents/$path" --method PUT -f message="chore: persist crypto daily notification state (api fallback)" -f content="$content" -f branch=main -f sha="$sha" >/dev/null; then
+                echo "Notification state persisted through GitHub Contents API."
+                exit 0
+              fi
+            else
+              if gh api "repos/$GITHUB_REPOSITORY/contents/$path" --method PUT -f message="chore: persist crypto daily notification state (api fallback)" -f content="$content" -f branch=main >/dev/null; then
+                echo "Notification state persisted through GitHub Contents API."
+                exit 0
+              fi
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "Notification accepted but dedupe state could not be persisted."
+          exit 1
