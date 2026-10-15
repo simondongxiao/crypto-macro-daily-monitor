@@ -45,10 +45,15 @@ def main() -> None:
         timeout=20,
     )
     response.raise_for_status()
-    body = response.json()
-    if body.get("code", 0) not in (0, None):
+    try:
+        body = response.json()
+    except ValueError as error:
+        raise SystemExit(f"Feishu webhook returned non-JSON response: HTTP {response.status_code}") from error
+    if not isinstance(body, dict) or "code" not in body:
+        raise SystemExit(f"Feishu webhook response missing code: {json.dumps(body, ensure_ascii=False)}")
+    if body["code"] != 0:
         raise SystemExit(f"Feishu webhook rejected request: {json.dumps(body, ensure_ascii=False)}")
-    print("Feishu notification sent")
+    print(f"Feishu notification accepted: code={body['code']}")
 
 
 if __name__ == "__main__":
