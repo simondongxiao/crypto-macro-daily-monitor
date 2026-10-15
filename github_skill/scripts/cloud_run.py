@@ -191,6 +191,10 @@ def main() -> None:
     data = json.loads(data_path.read_text(encoding="utf-8"))
     audit = {
         "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+        "workflow_event": os.environ.get("GITHUB_EVENT_NAME"),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "planned_run_bjt": f"{BUSINESS_DATE}T07:05:00+08:00",
+        "actual_run_bjt": NOW.isoformat(),
         "retrieved_bjt": data.get("retrieved_bjt"),
         "report_date": BUSINESS_DATE,
         "generated_at_bjt": NOW.isoformat(),
