@@ -256,7 +256,9 @@ def asset_bybit(symbol, captured_at: str):
     funding_ts = iso_ms(funding[0].get("fundingRateTimestamp")) if funding else None
     oi_ts = iso_ms(oi_rows[-1].get("timestamp")) if oi_rows else None
     taker_ts = iso_ms(sorted(ratio, key=lambda row: int(row["timestamp"]))[-1].get("timestamp")) if ratio else None
-    closed_kline_ts = iso_ms(bybit_klines(symbol, "60", 121)[-2][6])
+    # Bybit kline rows are [start_ms, open, high, low, close, volume, turnover].
+    # The last completed candle timestamp is the first column, not turnover.
+    closed_kline_ts = iso_ms(bybit_klines(symbol, "60", 121)[-2][0])
     return {
         "mark": mark,
         "change24": float(ticker.get("price24hPcnt") or 0) * 100,
@@ -306,7 +308,10 @@ def asset_okx(symbol, captured_at: str):
     mark_ts = iso_ms(ticker.get("ts"))
     funding_ts = iso_ms(funding.get("fundingTime"))
     oi_ts = iso_ms(oi.get("ts"))
-    closed_kline_ts = iso_ms(okx_klines(inst_id, "1H", 100)[-2][6])
+    # OKX candle rows are [ts, open, high, low, close, vol, volCcy, ...].
+    # Column 6 is volume in quote currency; using it as a timestamp creates a
+    # false 1970 stale-data audit and can make a fresh profile look invalid.
+    closed_kline_ts = iso_ms(okx_klines(inst_id, "1H", 100)[-2][0])
     return {
         "mark": mark,
         "change24": (mark / open24 - 1) * 100 if open24 else 0.0,
@@ -386,10 +391,23 @@ def build_source_audit(now: datetime, derivatives: dict[str, dict], macro: dict[
             "stale": None,
             "note": "No field-level provenance returned.",
         }
-    fields["stablecoins.total_usd"] = field_audit(
-        "DefiLlama stablecoins API", captured_at, None, max_age_seconds=86400,
-        note="Aggregate is derived by summing peggedAssets; API response has no single aggregate timestamp.",
-    )
+    if stablecoins.get("_unavailable"):
+        fields["stablecoins.total_usd"] = {
+            "source": "DefiLlama stablecoins API",
+            "captured_at": captured_at,
+            "data_timestamp": None,
+            "success": False,
+            "fallback": False,
+            "estimated_or_derived": False,
+            "stale": None,
+            "timestamp_anomaly": None,
+            "note": f"Unavailable this run: {stablecoins.get('_error', 'unknown error')}",
+        }
+    else:
+        fields["stablecoins.total_usd"] = field_audit(
+            "DefiLlama stablecoins API", captured_at, None, max_age_seconds=86400,
+            note="Aggregate is derived by summing peggedAssets; API response has no single aggregate timestamp.",
+        )
     fields["depth_btc"] = field_audit(depth_source, captured_at, None, max_age_seconds=300, note="Order-book snapshot retrieval time is the freshness timestamp.")
     fields["whale_treasury_orderflow"] = field_audit(
         "Binance/OKX spot + mempool.space + SEC EDGAR adapters",
@@ -425,7 +443,18 @@ def main():
             orderbook = okx("/api/v5/market/books", instId="BTC-USDT-SWAP", sz=20)[0]
             depth = {"bids": orderbook.get("bids", []), "asks": orderbook.get("asks", [])}
             depth_source = "OKX public SWAP order-book API"
-    stablecoins = get("https://stablecoins.llama.fi/stablecoins")
+    try:
+        stablecoins = get("https://stablecoins.llama.fi/stablecoins")
+    except Exception as error:
+        # A transient stablecoin endpoint failure must not discard the rest of
+        # the fresh market snapshot. Keep the field explicitly unavailable so
+        # the report and audit cannot mistake an old or estimated value for
+        # current data.
+        stablecoins = {
+            "peggedAssets": [],
+            "_unavailable": True,
+            "_error": str(error)[:240],
+        }
     whale_treasury_orderflow = collect_whale_treasury_orderflow(
         now,
         {asset: derivatives[asset]["mark"] for asset in ("BTC", "ETH", "SOL")},

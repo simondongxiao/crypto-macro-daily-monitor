@@ -48,6 +48,19 @@ S = json.loads(SUPPLEMENT_PATH.read_text(encoding="utf-8"))
 V = json.loads(VIEWS_PATH.read_text(encoding="utf-8"))
 if WHALE_PATH and WHALE_PATH.exists() and "whale_treasury_orderflow" not in D:
     D["whale_treasury_orderflow"] = json.loads(WHALE_PATH.read_text(encoding="utf-8"))
+
+DERIVATIVE_SOURCES = sorted({
+    str(D.get("derivatives", {}).get(asset, {}).get("source", "UNKNOWN"))
+    for asset in ("BTC", "ETH", "SOL")
+})
+if DERIVATIVE_SOURCES == ["BINANCE_USDM_DIRECT"]:
+    DERIVATIVE_SOURCE_LABEL = "Binance USDⓈ-M 直连"
+elif len(DERIVATIVE_SOURCES) == 1 and DERIVATIVE_SOURCES[0] == "OKX_PUBLIC_DERIVATIVES_FALLBACK":
+    DERIVATIVE_SOURCE_LABEL = "OKX 永续合约备选源（Binance/Bybit 本轮不可用）"
+elif len(DERIVATIVE_SOURCES) == 1 and DERIVATIVE_SOURCES[0] == "BYBIT_PUBLIC_DERIVATIVES_FALLBACK":
+    DERIVATIVE_SOURCE_LABEL = "Bybit 永续合约备选源（Binance 本轮不可用）"
+else:
+    DERIVATIVE_SOURCE_LABEL = "Binance/Bybit/OKX 混合来源（见数据审计）"
 REPORT_DATE = NOW.strftime("%Y-%m-%d")
 DAY_COMPACT = NOW.strftime("%Y%m%d")
 TAG = os.environ.get("CRYPTO_REPORT_TAG", NOW.strftime("%Y-%m-%d_%H%M%SBJT"))
@@ -66,6 +79,19 @@ LIGHT_GREEN = "E8F5E9"
 LIGHT_RED = "FCE8E6"
 GREY = "F2F4F5"
 TEXT = RGBColor(25, 33, 42)
+
+
+def parse_event_bjt(value: object) -> datetime | None:
+    """Parse the calendar's loose BJT labels without losing event ordering."""
+    if not isinstance(value, str):
+        return None
+    text = value.replace(" around ", " ").replace(" completed", "")
+    if len(text) == 10:
+        text += " 00:00"
+    try:
+        return datetime.fromisoformat(text).replace(tzinfo=BJT)
+    except ValueError:
+        return None
 
 
 def profile(asset: str) -> dict:
@@ -152,6 +178,15 @@ BTC_VAL = P["BTC"]["val"]
 BTC_POC = P["BTC"]["poc"]
 BTC_VAH = P["BTC"]["vah"]
 BTC_LOW24 = D["derivatives"]["BTC"]["low24"]
+btc_mark_for_location = D["derivatives"]["BTC"]["mark"]
+if btc_mark_for_location < BTC_VAL:
+    BTC_LOCATION = f"低于正常震荡区下沿 VAL {BTC_VAL:,.0f}"
+elif btc_mark_for_location < BTC_POC:
+    BTC_LOCATION = f"处于 VAL {BTC_VAL:,.0f} 与 POC {BTC_POC:,.0f} 之间、位于价值区下半部"
+elif btc_mark_for_location <= BTC_VAH:
+    BTC_LOCATION = f"处于 POC {BTC_POC:,.0f} 与 VAH {BTC_VAH:,.0f} 之间、位于价值区上半部"
+else:
+    BTC_LOCATION = f"高于正常震荡区上沿 VAH {BTC_VAH:,.0f}"
 LONG_ENTRY_LO, LONG_IDEAL, LONG_MAX = BTC_VAL - 100.0, BTC_VAL - 20.0, BTC_VAL + 50.0
 LONG_STOP, LONG_TP1, LONG_TP2 = BTC_VAL - 500.0, BTC_POC, BTC_VAH
 SHORT_ENTRY_LO, SHORT_IDEAL, SHORT_MAX = BTC_VAH - 100.0, BTC_VAH + 20.0, BTC_VAH + 80.0
@@ -162,7 +197,14 @@ LONG_WEIGHTED_RR = 0.4 * LONG_RR1 + 0.6 * LONG_RR2
 SHORT_RR1 = net_rr(SHORT_MAX, SHORT_STOP, SHORT_TP1, "short")
 SHORT_RR2 = net_rr(SHORT_MAX, SHORT_STOP, SHORT_TP2, "short")
 SHORT_WEIGHTED_RR = 0.4 * SHORT_RR1 + 0.6 * SHORT_RR2
+BTC_REGIME_LABEL = f"{REGIMES['BTC']['htf']} + {REGIMES['BTC']['execution']}"
+SHORT_SETUP_TYPE = "S2c" if REGIMES["BTC"]["htf"] == "HTF_TREND_DOWN" else "S5"
+SHORT_SETUP_NAME = "S2c 趋势回踩空" if SHORT_SETUP_TYPE == "S2c" else "S5 上沿受阻空"
+SHORT_SETUP_SUBTYPE = "TREND_PULLBACK" if SHORT_SETUP_TYPE == "S2c" else "RANGE_EDGE_REJECTION"
+SHORT_FLOW_MODE = "S2C_TREND_PULLBACK" if SHORT_SETUP_TYPE == "S2c" else "S5_RANGE_EDGE_SWEEP_RECLAIM_OR_REJECTION"
 LONG_VALID = LONG_RR1 >= 1.0 and LONG_WEIGHTED_RR >= 1.3
+LONG_SETUP_TYPE = "S1" if REGIMES["BTC"]["htf"] == "HTF_TREND_DOWN" else "S5"
+LONG_SETUP_NAME = "S1 流动性扫单反转多" if LONG_SETUP_TYPE == "S1" else "S5 下沿均值回归多"
 LONG_STATUS_TEXT = "下沿扫低收回后做多" if LONG_VALID else "INVALID：POC过近，TP1净R:R不足，不做多"
 STOP_DISTANCE = (LONG_MAX - LONG_STOP) / LONG_MAX
 NOTIONAL_EQUITY = 0.001 / STOP_DISTANCE
@@ -463,25 +505,28 @@ def make_document() -> Path:
     configure_run(subtitle.add_run(f"{REPORT_DATE} | 市场快照 {D['retrieved_bjt'][11:16]} BJT | 规则：snapshot-regime-router-v1 + dynamic-rr-v1 + turning-point-overlay-shadow-v1"), size=8.4, color=RGBColor(90, 90, 90))
 
     heading(doc, "数据快照说明")
-    paragraph(doc, f"本报告使用 {D['retrieved_bjt']} 的 Binance 同轮行情、衍生品、Deribit 期权、Binance/OKX 现货成交带与盘口快照；ETF 数据以本次输入中最新可核验公开值为准，ETH/SOL 当日值可能不完整，宏观、催化剂与大佬观点核验截止 {D['retrieved_bjt'][:10]} {D['retrieved_bjt'][11:16]} BJT。条件卡只在写明的有效期内成立，不代表全天自动监控。")
+    paragraph(doc, f"本报告使用 {D['retrieved_bjt']} 的 BTC/ETH/SOL 行情与 {DERIVATIVE_SOURCE_LABEL}、Deribit 期权、Binance/OKX 现货成交带与盘口快照；ETF 数据以本次输入中最新可核验公开值为准，ETH/SOL 当日值可能不完整，宏观、催化剂与大佬观点核验截止 {D['retrieved_bjt'][:10]} {D['retrieved_bjt'][11:16]} BJT。条件卡只在写明的有效期内成立，不代表全天自动监控。")
 
     heading(doc, "今日结论")
     btc_mark = D["derivatives"]["BTC"]["mark"]
-    paragraph(doc, f"当前价 {btc_mark:,.0f} 位于 POC {BTC_POC:,.0f} 上方、接近价值区上半部，不直接追多或追空；今天下沿多头路径因 POC 过近、TP1 净R:R不足而 INVALID，不执行。唯一保留的条件路径是上方 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高受阻后做空。条件卡有效至 {REPORT_DATE} 20:00 BJT，或结构/事件先失效。", size=11.0, bold=True, after=6)
+    paragraph(doc, f"当前价 {btc_mark:,.0f}{BTC_LOCATION}，现价不直接追单；下沿只有扫过 VAL {BTC_VAL:,.0f} 后收回并形成 HL 才做多，上沿只有进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 后冲高失败才做空。两条条件卡有效至 {REPORT_DATE} 20:00 BJT，或结构/事件先失效。", size=11.0, bold=True, after=6)
     heading(doc, "中线趋势与阶段交易", 3)
     table(doc, ["资产", "中线趋势", "当前阶段", "阶段交易优先级", "推翻条件"], [
-        ["BTC", TRENDS["BTC"]["label"], "日线低于20D但高于60D / 4H区间 / 现价位于价值区中上部", f"下沿多头 INVALID（POC过近）；只保留上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 受阻做空", f"4H重新形成明确趋势，或有效脱离 {BTC_VAL:,.0f}-{BTC_VAH:,.0f} 价值区"],
+        ["BTC", TRENDS["BTC"]["label"], f"日线低于20D但高于60D / {BTC_REGIME_LABEL} / {BTC_LOCATION}", f"下沿等{LONG_SETUP_NAME}；上沿等{SHORT_SETUP_NAME} {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f}", f"4H重新形成明确趋势，或有效脱离 {BTC_VAL:,.0f}-{BTC_VAH:,.0f} 价值区"],
         ["ETH", TRENDS["ETH"]["label"], "日线高于60D但低于20D / 4H过渡 / 现价接近VAL", f"观察 VAL {P['ETH']['val']:,.0f} 收回与 EMA20 {REGIMES['ETH']['details']['ema20']:,.0f}，无独立交易卡", f"4H重新站稳 EMA20 {REGIMES['ETH']['details']['ema20']:,.0f} 或跌破60D"],
         ["SOL", TRENDS["SOL"]["label"], "日线低于20D但高于60D / 4H过渡 / 现价接近VAL", f"只观察 VAL {P['SOL']['val']:,.2f} 附近的扫低收回，不给独立交易卡", f"4H 收回 EMA20 {REGIMES['SOL']['details']['ema20']:,.2f} 且日线重新站回20D"],
     ], font=7.1, first_col_bold=True)
-    paragraph(doc, "三者日线都低于20日均线但仍高于60日均线，BTC的4H是区间，ETH/SOL处于过渡，因此当前更准确的描述是‘中线震荡、短线偏弱’，还不是确认的大级别牛市或熊市。今天下沿多头因第一阻力过近而取消，只保留上沿受阻空头条件。")
+    paragraph(doc, f"三者日线都低于20日均线但仍高于60日均线，BTC当前为 {BTC_REGIME_LABEL}，ETH/SOL处于过渡，因此当前更准确的描述是‘中线震荡、短线偏弱’，还不是确认的大级别牛市或熊市。今天只允许下沿扫低收回多、上沿回踩受阻空，现价附近不交易。")
 
     heading(doc, "今日条件式交易预案", 3)
+    long_plan_label = f"BTC 多（{LONG_SETUP_NAME}）" if LONG_VALID else "BTC 多（无合格预案）"
+    long_trigger = f"跌破 VAL {BTC_VAL:,.0f} 后，15m/30m 收回 {BTC_VAL:,.0f} 并形成 HL，且卖压减弱" if LONG_VALID else f"下沿 {LONG_ENTRY_LO:,.0f}-{LONG_MAX:,.0f} 未通过本轮 R:R/结构闸门"
+    long_expiry = f"{REPORT_DATE} 20:00；跌回VAL下方或事件/结构失效即取消" if LONG_VALID else "本轮取消；等待价值区重算"
     table(doc, ["优先级", "品种/方向", "If-Then 触发", "Entry / Max", "SL", "TP1 / TP2", "净R:R", "到期/取消"], [
-        ["1", "BTC 多（S1/S5）INVALID", f"下沿 {LONG_ENTRY_LO:,.0f}-{LONG_MAX:,.0f} 即使扫低收回也不执行：POC {BTC_POC:,.0f} 距离过近，TP1净R:R不足", f"{LONG_ENTRY_LO:,.0f}-{LONG_MAX:,.0f} / {LONG_MAX:,.0f}", f"{LONG_STOP:,.0f}", f"{LONG_TP1:,.0f} / {LONG_TP2:,.0f}", f"TP1 1:{LONG_RR1:.2f}；加权 1:{LONG_WEIGHTED_RR:.2f}", "本轮取消；等待价值区重算"],
-        ["2", "BTC 空（S5上沿受阻回落）", f"若价格进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f}，15m/30m出现冲高失败、LH并重新跌回 VAH {BTC_VAH:,.0f} 下方，且 Taker<0.90或OI继续增加而价格不再上行，则执行", f"{SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} / {SHORT_MAX:,.0f}", f"{SHORT_STOP:,.0f}", f"{SHORT_TP1:,.0f} / {SHORT_TP2:,.0f}", f"TP1 1:{SHORT_RR1:.2f}；加权 1:{SHORT_WEIGHTED_RR:.2f}", f"{REPORT_DATE} 20:00；重新站稳Max Entry或价值区重算即取消"],
+        ["1", long_plan_label, long_trigger, f"{LONG_ENTRY_LO:,.0f}-{LONG_MAX:,.0f} / {LONG_MAX:,.0f}", f"{LONG_STOP:,.0f}", f"{LONG_TP1:,.0f} / {LONG_TP2:,.0f}", f"TP1 1:{LONG_RR1:.2f}；加权 1:{LONG_WEIGHTED_RR:.2f}", long_expiry],
+        ["2", f"BTC 空（{SHORT_SETUP_NAME}）", f"若价格进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f}，15m/30m出现冲高失败、LH并重新跌回 VAH {BTC_VAH:,.0f} 下方，且 Taker<0.90或OI继续增加而价格不再上行，则执行", f"{SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} / {SHORT_MAX:,.0f}", f"{SHORT_STOP:,.0f}", f"{SHORT_TP1:,.0f} / {SHORT_TP2:,.0f}", f"TP1 1:{SHORT_RR1:.2f}；加权 1:{SHORT_WEIGHTED_RR:.2f}", f"{REPORT_DATE} 20:00；重新站稳Max Entry或价值区重算即取消"],
     ], font=6.2, first_col_bold=True)
-    paragraph(doc, f"BTC 当前在 POC {BTC_POC:,.0f} 附近，POC 可以理解为最近成交最拥挤的中轴，不是追单位置。今天下沿多头卡因第一阻力过近被取消；只有上方 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高失败、跌回 VAH 下方并形成 LH，才考虑做空。每张有效卡最多0.10%账户风险，只是亏损上限，不是必须用满的目标仓位。", size=10.0, after=6)
+    paragraph(doc, f"BTC 当前{BTC_LOCATION}；POC {BTC_POC:,.0f} 可以理解为最近成交最拥挤的中轴，不是追单位置。下沿多头必须先扫过 VAL {BTC_VAL:,.0f} 再收回并形成 HL，上沿空头必须先进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 再冲高失败；每张有效卡最多0.10%账户风险，只是亏损上限，不是必须用满的目标仓位。", size=10.0, after=6)
 
     heading(doc, "阶段顶底雷达（Shadow）", 3)
     turning_rows = []
@@ -503,56 +548,56 @@ def make_document() -> Path:
             "SHADOW_UNCALIBRATED",
         ])
     table(doc, ["窗口", "统计±1σ", "条件底带", "条件顶带", "历史近邻：底/顶/无", "双向洗盘", "有效N", "状态"], turning_rows, font=6.6)
-    paragraph(doc, f"这不是胜率。当前统计带只用于说明波动范围，不能把某一个点位当成绝对顶部。今天更重要的是观察上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否冲高失败并形成LH；VAL {BTC_VAL:,.0f} 即使收回，也因POC过近而暂不构成多头交易条件。")
+    paragraph(doc, f"这不是胜率。当前统计带只用于说明波动范围，不能把某一个点位当成绝对顶部。今天要同时观察下沿是否扫过 VAL {BTC_VAL:,.0f} 后收回形成 HL，以及上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否冲高失败形成 LH；现价不属于执行区。")
 
     heading(doc, "今日交易台")
     table(doc, ["标的", "Bias", "Location", "Regime", "交易含义"], [
-        ["BTC", TRENDS["BTC"]["label"], f"VAL {P['BTC']['val']:,.0f} / POC {P['BTC']['poc']:,.0f} / VAH {P['BTC']['vah']:,.0f}", f"{REGIMES['BTC']['htf']} + {REGIMES['BTC']['execution']}", "区间中部不追单；下沿多 INVALID；只等上沿受阻空"],
+        ["BTC", TRENDS["BTC"]["label"], f"VAL {P['BTC']['val']:,.0f} / POC {P['BTC']['poc']:,.0f} / VAH {P['BTC']['vah']:,.0f}", BTC_REGIME_LABEL, f"{BTC_LOCATION}不追单；下沿等扫低收回多；上沿等{SHORT_SETUP_NAME}"],
         ["ETH", TRENDS["ETH"]["label"], f"VAL {P['ETH']['val']:,.0f} / POC {P['ETH']['poc']:,.0f} / VAH {P['ETH']['vah']:,.0f}", f"{REGIMES['ETH']['htf']} + {REGIMES['ETH']['execution']}", "过渡区，等待重新站回EMA20或跌破60D"],
         ["SOL", TRENDS["SOL"]["label"], f"VAL {P['SOL']['val']:,.2f} / POC {P['SOL']['poc']:,.2f} / VAH {P['SOL']['vah']:,.2f}", f"{REGIMES['SOL']['htf']} + {REGIMES['SOL']['execution']}", "4H过渡、接近VAL，不追空也不接多"],
         ["Alt breadth", "普遍反弹但未确认轮动", f"XRP {D['derivatives']['XRP']['change24']:+.2f}%；DOGE {D['derivatives']['DOGE']['change24']:+.2f}%；AVAX {D['derivatives']['AVAX']['change24']:+.2f}%", "Relief bounce", "S4不执行，只保留研究"],
     ], font=7.2)
-    paragraph(doc, f"POC {BTC_POC:,.0f} 是最近五天成交最密集的价格，可理解为短期筹码最拥挤的‘价格磁铁’；VAL {BTC_VAL:,.0f} 是正常震荡区下沿，VAH {BTC_VAH:,.0f} 是正常震荡区上沿。BTC 当前在 POC 上方、靠近价值区上半部，但仍未进入上沿执行带，不是自动做多或做空；今天下沿多头因 POC 过近而取消，只等待上沿冲高失败。")
+    paragraph(doc, f"POC {BTC_POC:,.0f} 是最近五天成交最密集的价格，可理解为短期筹码最拥挤的‘价格磁铁’；VAL {BTC_VAL:,.0f} 是正常震荡区下沿，VAH {BTC_VAH:,.0f} 是正常震荡区上沿。BTC 当前{BTC_LOCATION}，仍未进入任一执行带，不是自动做多或做空；下沿等扫低收回，上沿等冲高失败。")
 
     heading(doc, "S1-S5 Setup Scanner", 2)
     table(doc, ["Setup", "必要条件", "本轮结论"], [
-        ["S1 流动性扫单", f"扫过VAL {BTC_VAL:,.0f}后快速收回，卖压减弱并形成HL", "本轮24h低点仍在 VAL 上方，尚未触达下沿扫单区"],
-        ["S2c 趋势回踩", "4H趋势方向与回踩位置一致，反弹至EMA20/VAL后形成LH", "BTC/ETH处于过渡区，不给趋势回踩卡"],
+        ["S1 流动性扫单", f"扫过VAL {BTC_VAL:,.0f}后快速收回，卖压减弱并形成HL", f"{LONG_SETUP_NAME}条件已定义；本轮24h低点仍在VAL上方，尚未触发"],
+        ["S2c 趋势回踩", "4H趋势方向与回踩位置一致，反弹至EMA20/VAL后形成LH", f"BTC {SHORT_SETUP_NAME} 条件路径；ETH/SOL没有独立交易卡"],
         ["S3 去杠杆反转", "急跌、OI明显重置、Funding冷却、吸收并收回结构", "XRP有价格弱、OI增的分化，但未出现结构收回，不执行"],
         ["S4 题材轮动", "同一题材至少两个代表币、广度、独立催化与基本面共同确认", "AVAX/XRP/DOGE虽反弹，但没有同题材广度与基本面确认"],
-        ["S5 区间均值回归", "触及VAL/VAH边缘并收回，最差入场R:R通过", f"下沿多头 INVALID；只保留上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 受阻做空"],
+        ["S5 区间均值回归", "只有HTF_RANGE且触及VAL/VAH边缘并收回，最差入场R:R通过", f"当前 {BTC_REGIME_LABEL}，S5不作为主执行；上沿路径按 {SHORT_SETUP_NAME} 处理"],
     ], font=7.0)
-    paragraph(doc, f"现在 BTC 在 POC {BTC_POC:,.0f} 上方、处于价值区中上部，不能把反弹强度当成追多信号。今天下沿多头因 POC 过近而取消，空头只等上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高失败。AVAX、XRP和DOGE没有形成同一题材的广度、主动买盘和基本面共振，S4仍不执行。")
+    paragraph(doc, f"现在 BTC {BTC_LOCATION}，不能把反弹强度当成追多信号。下沿多头只等扫过 VAL {BTC_VAL:,.0f} 后收回形成 HL，空头只等上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 冲高失败。AVAX、XRP和DOGE没有形成同一题材的广度、主动买盘和基本面共振，S4仍不执行。")
 
     heading(doc, "第一优先级机会卡", 3)
     table(doc, ["资产", "方向 / Setup", "Regime", "为什么存在", "触发 / 当前价", "Ideal Entry", "Max Entry", "SL", "First Obstacle", "TP2", "净R:R", "状态", "Starter Risk", "加仓条件", "取消 / Missed"], [
-        ["BTC", "S5上沿受阻空；下沿多 INVALID", "HTF_RANGE + RANGE_MIDDLE_UPPER_HALF", "现价位于POC上方、接近价值区上半部；下沿第一阻力过近，只有上沿有合格位置", f"空：触及 VAH {BTC_VAH:,.0f} 后跌回；现价 {btc_mark:,.0f}", f"空 {SHORT_IDEAL:,.0f}", f"空 {SHORT_MAX:,.0f}", f"空 {SHORT_STOP:,.0f}", f"空看 POC {BTC_POC:,.0f}", f"空看 VAL {BTC_VAL:,.0f}", f"空 1:{SHORT_WEIGHTED_RR:.2f}", "NOT TRIGGERED — WAIT", "最多0.10%账户风险上限", "跌回VAH下并形成LH", "重新站稳Max Entry即取消；超过Max Entry = MISSED — DO NOT CHASE"],
+        ["BTC", f"{SHORT_SETUP_NAME}；{LONG_SETUP_NAME}", BTC_REGIME_LABEL, f"现价{BTC_LOCATION}；两端都有结构位置，但现价不在执行区", f"空：触及 VAH {BTC_VAH:,.0f} 后跌回；多：扫过 VAL {BTC_VAL:,.0f} 后收回；现价 {btc_mark:,.0f}", f"空 {SHORT_IDEAL:,.0f} / 多 {LONG_IDEAL:,.0f}", f"空 {SHORT_MAX:,.0f} / 多 {LONG_MAX:,.0f}", f"空 {SHORT_STOP:,.0f} / 多 {LONG_STOP:,.0f}", f"空看 POC {BTC_POC:,.0f} / 多看 POC {BTC_POC:,.0f}", f"空看 VAL {BTC_VAL:,.0f} / 多看 VAH {BTC_VAH:,.0f}", f"空 1:{SHORT_WEIGHTED_RR:.2f} / 多 1:{LONG_WEIGHTED_RR:.2f}", "NOT TRIGGERED — WAIT", "每张最多0.10%账户风险上限", "各自出现 LH/HL 且流量不恶化", "对应结构失效或超过Max Entry = MISSED — DO NOT CHASE"],
     ], font=5.8)
-    paragraph(doc, f"这张卡不是现在立即下单：BTC 仍在中部。下沿多头因 POC 距离过近被取消；只有到上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 并出现受阻、跌回 VAH 下方形成 LH，才从等待进入执行判断；触发后也不能超过 Max Entry 追价。")
+    paragraph(doc, f"这张卡不是现在立即下单：BTC 仍在价值区下半部。下沿要先扫过 VAL {BTC_VAL:,.0f} 再收回形成 HL，上沿要进入 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 后受阻并跌回 VAH 下方形成 LH；两边触发后都不能超过 Max Entry 追价。")
 
     heading(doc, "Opportunity Funnel", 2)
     table(doc, ["Universe", "映射位置", "风险通过候选", "预授权", "早期接受", "确认", "模型成交", "主要淘汰原因"], [
-        ["13 个流动标的", "BTC价值区上沿 + S5", "1", "BTC上沿受阻空1张条件卡", "0", "0", "0", "下沿多头TP1净R:R不足；ETH/SOL未给更好位置；山寨未形成题材共振"],
+        ["13 个流动标的", f"BTC价值区两端 + {LONG_SETUP_TYPE}/{SHORT_SETUP_TYPE}", "2", "BTC上下沿各1张条件卡", "0", "0", "0", "现价不在执行区；ETH/SOL未给更好位置；山寨未形成题材共振"],
     ], font=6.9)
-    paragraph(doc, "扫描了13个流动标的，只有 BTC 上沿的 S5 受阻做空路径通过位置和动态盈亏比检查。下沿多头因第一阻力过近、TP1净R:R不足而 INVALID；当前空头卡仍未触发，没有模型成交，当前价附近不追单。")
+    paragraph(doc, f"扫描了13个流动标的，BTC上下沿各有一张通过位置和动态盈亏比检查的条件卡，分别是 {LONG_SETUP_NAME} 与 {SHORT_SETUP_NAME}。两张卡都尚未触发，没有模型成交，当前价附近不追单。")
 
     heading(doc, "Kelly 与组合风险", 2)
     table(doc, ["Setup", "Regime", "Historical N", "Wins", "p_raw", "p_adj", "Avg Win R", "Avg Loss R", "Expectancy R", "b", "Full Kelly", "Kelly Status"], [
-        ["BTC S5 下沿收回多 / 上沿受阻空", "HTF_RANGE / RANGE_MIDDLE_UPPER_HALF", "0", "0", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "INSUFFICIENT_SAMPLE"],
+        [f"BTC {LONG_SETUP_TYPE}/{SHORT_SETUP_TYPE} 两端条件卡", BTC_REGIME_LABEL, "0", "0", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "INSUFFICIENT_SAMPLE"],
     ], font=6.7)
     table(doc, ["Allowed Fraction", "Kelly Ceiling", "Setup Cap", "Regime Cap", "Correlation Cap", "Daily Remaining", "Final Allowed Risk", "Risk Mode"], [
         ["0", "0%", "0.75% hard ceiling", "0.25% ceiling", "BTC_CORE 0.80% ceiling", "UNKNOWN", "0.10% ceiling per card", "BOOTSTRAP_CALIBRATION"],
     ], font=6.9)
     table(doc, ["Evidence Source", "Setup Subtype", "Model N / User N", "Stop Distance", "Notional / Equity", "Leverage", "Margin / Equity", "Liquidation Buffer"], [
-        ["Immutable model ledger", "S5_RANGE_EDGE_SWEEP_RECLAIM_REJECTION", "0 / UNKNOWN", f"{(SHORT_STOP-SHORT_MAX)/SHORT_MAX*100:.2f}%", f"{(0.001/((SHORT_STOP-SHORT_MAX)/SHORT_MAX))*100:.1f}%", "1x-2x", f"{(0.001/((SHORT_STOP-SHORT_MAX)/SHORT_MAX))*50:.1f}%-{(0.001/((SHORT_STOP-SHORT_MAX)/SHORT_MAX))*100:.1f}%", ">3x stop distance required"],
+        ["Immutable model ledger", f"{SHORT_SETUP_TYPE}_{SHORT_SETUP_SUBTYPE}", "0 / UNKNOWN", f"{(SHORT_STOP-SHORT_MAX)/SHORT_MAX*100:.2f}%", f"{(0.001/((SHORT_STOP-SHORT_MAX)/SHORT_MAX))*100:.1f}%", "1x-2x", f"{(0.001/((SHORT_STOP-SHORT_MAX)/SHORT_MAX))*50:.1f}%-{(0.001/((SHORT_STOP-SHORT_MAX)/SHORT_MAX))*100:.1f}%", ">3x stop distance required"],
     ], font=6.8)
     paragraph(doc, "这里的0.10%是账户权益最大亏损预算，不是仓位占比，也不是要求一定用满。N=0只表示系统尚未积累同规则、同环境的已完成模型交易，并不表示用户亏了0笔或赚了0笔；Kelly不能启用，只能用极小Bootstrap测试上限。用户已有仓位未知，实际下单前还要从日内剩余风险中扣除。")
 
     heading(doc, "昨日框架复盘")
     table(doc, ["冻结计划", "有效期内真实路径", "模型结果", "预测质量", "本轮调整"], [
-        ["BTC S5上沿受阻空；下沿多 INVALID", "上一版至本次刷新，没有可核验的模型成交证据；不回填后续价格", "UNTRIGGERED / INVALID_LONG / 未成交", "没有成交记录，不能把后续路径倒算成盈利或亏损", f"本次新快照把价值区重算为 VAL {BTC_VAL:,.0f} / POC {BTC_POC:,.0f} / VAH {BTC_VAH:,.0f}，下沿多头因第一阻力过近取消，仅保留上沿空头条件卡"],
+        [f"BTC {LONG_SETUP_NAME} / {SHORT_SETUP_NAME}", "上一版至本次刷新，没有可核验的模型成交证据；不回填后续价格", "UNTRIGGERED / 未成交", "没有成交记录，不能把后续路径倒算成盈利或亏损", f"本次新快照把价值区重算为 VAL {BTC_VAL:,.0f} / POC {BTC_POC:,.0f} / VAH {BTC_VAH:,.0f}，两端条件卡均保留，现价不在执行区"],
     ], font=6.9)
-    paragraph(doc, f"上一版条件卡没有可核验成交，因此不回填盈利或亏损。今天重新计算后，BTC 价值区为 VAL {BTC_VAL:,.0f}、POC {BTC_POC:,.0f}、VAH {BTC_VAH:,.0f}，当前 Regime 为4H区间、执行级别位于中上部；下沿多头因第一阻力过近取消，只保留上沿冲高失败做空。这是按新快照和新 Regime 重算，不是把旧计划改成盈利。")
+    paragraph(doc, f"上一版条件卡没有可核验成交，因此不回填盈利或亏损。今天重新计算后，BTC 价值区为 VAL {BTC_VAL:,.0f}、POC {BTC_POC:,.0f}、VAH {BTC_VAH:,.0f}，当前 Regime 为 {BTC_REGIME_LABEL}，价格{BTC_LOCATION}；两端条件卡均保留，现价不在执行区。这是按新快照和新 Regime 重算，不是把旧计划改成盈利。")
 
     heading(doc, "核心市场状态仪表盘")
     table(doc, ["资产", "Mark / 24h", "VAL / POC / VAH", "Funding", "OI notional / 24h", "Taker 最近3h"], [
@@ -564,8 +609,8 @@ def make_document() -> Path:
          " / ".join(f"{x:.3f}" for x in D['derivatives'][asset]['taker_last3'])]
         for asset in ("BTC", "ETH", "SOL")
     ], font=7.0)
-    paragraph(doc, f"VAL 是正常震荡区下沿，POC 是近期成交最集中的价格，VAH 是正常震荡区上沿。BTC、ETH、SOL 当前都在各自价值区内，其中 BTC 更靠近 POC，说明三者都不是价值区外的极端位置；这不等于自动追多或追空。BTC 最近一个 Taker 为 {D['derivatives']['BTC']['taker_last3'][-1]:.3f}，今天只有上沿冲高失败形成更低高点，才有空头交易依据；下沿多头要等价值区重算后第一阻力拉开。")
-    add_picture(doc, CHARTS["levels"], "图1：BTC/ETH/SOL 最近 72 小时收盘与估算 5 日正常成交区。数据：Binance USDⓈ-M 1h；按每小时典型价格分配成交量，属于 PROXY。")
+    paragraph(doc, f"VAL 是正常震荡区下沿，POC 是近期成交最集中的价格，VAH 是正常震荡区上沿。BTC、ETH、SOL 当前都在各自价值区内，其中 BTC 更靠近 POC，说明三者都不是价值区外的极端位置；这不等于自动追多或追空。BTC 最近一个 Taker 为 {D['derivatives']['BTC']['taker_last3'][-1]:.3f}，下沿多头要等扫过 VAL 后收回形成 HL，上沿空头要等冲高失败形成 LH。")
+    add_picture(doc, CHARTS["levels"], f"图1：BTC/ETH/SOL 最近 72 小时收盘与估算 5 日正常成交区。数据：{DERIVATIVE_SOURCE_LABEL} 1h；按每小时典型价格分配成交量，属于 PROXY。")
 
     heading(doc, "宏观与跨资产联动")
     macro_rows = [["美国 9月非农", "+29k vs 约 +84k 预期", "失业率 4.2%；工资 +0.1% m/m；前两月 -60k 修正", "增长降温，但 BTC 反应为先涨后跌，不能只按降息叙事交易"]]
@@ -573,7 +618,7 @@ def make_document() -> Path:
         name, f"{row['last']:,.2f}", f"{row['change_pct']:+.2f}%", "风险资产支持" if name in ("S&P 500", "Nasdaq") and row["change_pct"] >= 0 else "风险资产压制" if name in ("S&P 500", "Nasdaq") else "美元边际缓解" if name == "DXY" and row["change_pct"] < 0 else "美元边际压制" if name == "DXY" else "收益率回落，边际缓解" if name == "US10Y" and row["change_pct"] < 0 else "收益率上行形成压制" if name == "US10Y" else "跨资产背景"
     ] for name, row in D["macro"].items())
     table(doc, ["项目", "最新值/结果", "变化", "对加密的含义"], macro_rows, font=7.0)
-    paragraph(doc, "今天的跨资产信号偏混合：标普和纳指上涨，提供风险偏好支持；但 DXY 与10年期收益率也上行，说明美元和利率仍有压制，黄金上涨又提示避险与通胀对冲需求。宏观没有给出可以覆盖技术结构的单边优势，因此不在 BTC POC 中部猜方向，只等待上沿受阻空；下沿多头因第一阻力过近暂不执行。")
+    paragraph(doc, f"今天的跨资产信号偏混合：标普和纳指上涨，提供风险偏好支持；但 DXY 与10年期收益率也上行，说明美元和利率仍有压制，黄金上涨又提示避险与通胀对冲需求。宏观没有给出可以覆盖技术结构的单边优势，因此不在 BTC {BTC_LOCATION} 猜方向，只执行两端条件：下沿扫低收回多、上沿受阻空。")
 
     heading(doc, "大佬观点与叙事转向")
     table(doc, ["人物/机构", "核验结果", "此前 -> 当前", "本轮处理"], [
@@ -642,7 +687,7 @@ def make_document() -> Path:
     eth_oi_dir = "增加" if D["derivatives"]["ETH"]["oi24_pct"] >= 0 else "下降"
     sol_oi_dir = "增加" if D["derivatives"]["SOL"]["oi24_pct"] >= 0 else "下降"
     paragraph(doc, f"BTC 24小时{btc_dir} {abs(D['derivatives']['BTC']['change24']):.2f}%、OI {btc_oi_dir} {abs(D['derivatives']['BTC']['oi24_pct']):.2f}%，最近三小时 Taker 为 {'、'.join(f'{x:.3f}' for x in D['derivatives']['BTC']['taker_last3'])}：价格与OI同步增加更像反弹中的杠杆回补，但末端 Taker 尚未稳定站上1.10，不能直接当成趋势反转。ETH 24小时{eth_dir} {abs(D['derivatives']['ETH']['change24']):.2f}%、OI {eth_oi_dir} {abs(D['derivatives']['ETH']['oi24_pct']):.2f}%；SOL 24小时{sol_dir} {abs(D['derivatives']['SOL']['change24']):.2f}%、OI {sol_oi_dir} {abs(D['derivatives']['SOL']['oi24_pct']):.2f}%。当前更像下跌后的修复与重新加杠杆混合，只有价格重新站回价值区、Taker持续改善且OI扩张不伴随冲高回落，才升级为趋势反转观察。")
-    add_picture(doc, CHARTS["derivatives"], "图3：OI notional 六个日度观察、24h OI 变化、Funding 与最近三小时 Taker Buy/Sell Imbalance Proxy。Taker 比率不是 CVD。来源：Binance USDⓈ-M。")
+    add_picture(doc, CHARTS["derivatives"], f"图3：OI notional 六个日度观察、24h OI 变化、Funding 与最近三小时 Taker Buy/Sell Imbalance Proxy。Taker 比率不是 CVD。来源：{DERIVATIVE_SOURCE_LABEL}。")
 
     heading(doc, "期权、成本与持仓结构")
     table(doc, ["资产", "全期限 Put/Call OI", "近月到期", "近月 Put/Call", "派生 Max Pain", "高 OI 锚"], [
@@ -704,18 +749,35 @@ def make_document() -> Path:
         ["User Realized Ledger", "UNKNOWN", "UNKNOWN", "没有用户成交确认"],
         ["Counterfactual", "不适用", "N/A", "价格始终未触及旧入场区"],
     ], font=7.1)
-    paragraph(doc, "上一版 BTC S5 条件卡没有可核验成交，所以没有模型交易，也不能计入 Kelly。今天下沿多头因第一阻力过近取消，只保留‘反弹失败做空’路径；有效卡的最大风险预算仍是0.10%，不是要求必须用满的目标仓位。")
+    paragraph(doc, f"上一版 BTC {LONG_SETUP_TYPE}/{SHORT_SETUP_TYPE} 条件卡没有可核验成交，所以没有模型交易，也不能计入 Kelly。今天两端条件卡都只是触发后执行的预案；每张有效卡的最大风险预算仍是0.10%，不是要求必须用满的目标仓位。")
 
     heading(doc, "未来大事催化")
     catalyst_rows = []
     for event in S["catalysts"]:
         impact = "DXY/收益率 -> BTC/ETH/SOL" if "US " in event["event"] or "FOMC" in event["event"] else "SOL 供应节奏" if "Solana" in event["event"] else "LINK 基础设施预期" if "Chainlink" in event["event"] else "美国加密监管"
-        state = "已落地" if event["classification"] == "Event Outcome" else "待公布"
+        # A scheduled item whose release time has passed cannot remain a
+        # future catalyst. The supplement may carry a verified outcome, while
+        # older unresolved items are explicitly marked as outcome pending.
+        event_dt = parse_event_bjt(event.get("time_bjt"))
+        past_due = event_dt is not None and event_dt <= NOW
+        state = "已落地" if event["classification"] == "Event Outcome" else ("已落地（结果待核验）" if past_due else "待公布")
         confirmation = "公布后15m价格、收益率、DXY与OI同向" if state == "待公布" and impact.startswith("DXY") else "规模保持低于1%流通量" if "Solana" in event["event"] else "测试按期完成且无故障" if "Chainlink" in event["event"] else "新投票日期/正式议程"
         invalidation = "日期更改或官方取消" if state == "待公布" else "没有新议程前不当未来催化"
         catalyst_rows.append([event["time_bjt"], event["classification"], event["event"], state, event["first_confirmed"], event["incremental_change"], event["assets"], impact, confirmation, invalidation])
     table(doc, ["时间 BJT", "分类", "事件", "状态", "首次确认", "本次新增", "资产", "传导", "确认", "失效/处理"], catalyst_rows, font=5.5)
-    paragraph(doc, "已发生或计划日期已过去的事件不会因为当天没有新消息就从时间线消失；报告把它们标为‘已落地’，并单独写首次确认时间和本次是否新增。10月13日 Solana staking rewards、10月8日稳定币与10月9日 MOVE 解锁的计划时间都已过去，但本轮没有取得实际结果，因此保留为已落地事件而不是重新列为待公布。下一项正式宏观节点是10月14日CPI；CLARITY投票结果没有新日期，只保留历史结果。")
+    future_events = []
+    for event in S["catalysts"]:
+        event_dt = parse_event_bjt(event.get("time_bjt"))
+        if event_dt is None:
+            continue
+        if event_dt > NOW and event["classification"] != "Event Outcome":
+            future_events.append((event_dt, event["event"], event["time_bjt"]))
+    future_events.sort()
+    next_event_text = "暂无已核验的未来节点"
+    if future_events:
+        _, next_name, next_time = future_events[0]
+        next_event_text = f"下一项待公布节点为 {next_name}（{next_time} BJT）"
+    paragraph(doc, f"已发生或计划日期已过去的事件不会因为当天没有新消息就从时间线消失；报告把它们标为‘已落地’或‘已落地（结果待核验）’，并单独写首次确认时间和本次新增变化。CPI与PPI已按官方发布结果更新，不再列为待公布；{next_event_text}。CLARITY投票没有新日期，只保留历史结果。")
 
     heading(doc, "明日观察清单")
     table(doc, ["优先级", "观察点", "具体判定", "对应动作"], [
@@ -725,11 +787,11 @@ def make_document() -> Path:
         ["4", "ETF", "BTC 流入能否扩张、ETH 是否结束连续流出", "判断资金是否从 BTC 向 beta 扩散"],
         ["5", "山寨广度", "AVAX/XRP能否形成同题材扩散，并且Taker与可核验链上指标共同改善", "否则只保留研究主线"],
     ], font=7.0)
-    paragraph(doc, f"下一轮最重要的不是猜 BTC 会涨还是跌，而是观察上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否出现冲高失败。今天 VAL {BTC_VAL:,.0f} 附近即使收回，也因 POC {BTC_POC:,.0f} 过近而不能直接做多；只有价值区重算后第一阻力重新拉开，才恢复多头评估。当前价附近不追空，也不直接抄底。")
+    paragraph(doc, f"下一轮最重要的不是猜 BTC 会涨还是跌，而是观察下沿是否扫过 VAL {BTC_VAL:,.0f} 后收回形成 HL，或上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否冲高失败形成 LH。当前价附近不追空，也不直接抄底；只有触发对应条件后，才按表内 Entry、Max Entry、止损和目标执行。")
 
     heading(doc, "数据与来源")
     table(doc, ["模块", "主源/备用", "观察时间", "结果", "证据"], [
-        ["价格/衍生品", "Binance USDⓈ-M direct API", D["retrieved_bjt"], "SUCCESS", "VERIFIED"],
+        ["价格/衍生品", DERIVATIVE_SOURCE_LABEL, D["retrieved_bjt"], "SUCCESS", "VERIFIED / fallback where noted"],
         ["现货大单/盘口", "Binance Spot / OKX fallback", wt["retrieved_bjt"], wt["status"], "VERIFIED per successful venue"],
         ["宏观/事件", "Federal Reserve, BLS, BEA; Yahoo cross-asset", f"{D['retrieved_bjt'][:10]} {D['retrieved_bjt'][11:16]} BJT", "SUCCESS", "VERIFIED / latest market close"],
         ["BTC/ETH/SOL ETF", "CryptoMeter / Alpha Finance; Farside fallback", "latest published values in current input; ETH/SOL partial", "PARTIAL", "SECONDARY"],
@@ -739,7 +801,7 @@ def make_document() -> Path:
         ["标签化 CEX 钱包净流", "Public exchange API check / no authenticated labelled provider", D["retrieved_bjt"], "UNAVAILABLE", "UNAVAILABLE"],
         ["期权", "Deribit public API; local max-pain derivation", D["retrieved_bjt"], "SUCCESS", "VERIFIED + DERIVED"],
         ["链上 realized/STH cost", "Public-source scan", REPORT_DATE, "UNAVAILABLE", "UNAVAILABLE"],
-        ["Volume Profile", "Binance 1h OHLCV typical-price allocation", D["retrieved_bjt"], "SUCCESS", "PROXY"],
+        ["Volume Profile", f"{DERIVATIVE_SOURCE_LABEL} 1h OHLCV typical-price allocation", D["retrieved_bjt"], "SUCCESS", "PROXY"],
         ["真实清算热力图", "CoinGlass/Hyblock lawful public access", REPORT_DATE, "UNAVAILABLE", "UNAVAILABLE; stop proxy shown separately"],
         ["山寨基本面/解锁", "DefiLlama chain/unlock pages", REPORT_DATE, "PARTIAL; AVAX only", "SECONDARY"],
         ["大佬观点", "Google News candidate monitor + SEC/Senate/White House/issuer checks", V["cutoff_bjt"], V["status"], "VERIFIED where promoted"],
@@ -761,12 +823,12 @@ def write_state_and_ledger(report_path: Path) -> None:
         "timestamp_bjt": D["retrieved_bjt"],
         "rule_version": "crypto-macro-daily-review-s1-s5-dynamic-rr-v1 + crypto-macro-daily-review-execution-learning-v2",
         "report_file": report_path.name,
-        "regime": "HTF_RANGE_RANGE_MIDDLE_UPPER_HALF",
-        "bias": "MEDIUM_TERM_RANGE_CURRENT_UPPER_HALF",
+        "regime": BTC_REGIME_LABEL,
+        "bias": "MEDIUM_TERM_RANGE_CURRENT_LOWER_HALF" if btc_mark_for_location < BTC_POC else "MEDIUM_TERM_RANGE_CURRENT_UPPER_HALF",
         "major_levels": {asset: {key: P[asset][key] for key in ("val", "poc", "vah", "low", "high")} for asset in ("BTC", "ETH", "SOL")},
-        "active_candidate": f"{DAY_COMPACT}-{TAG[-8:]}-btc-s5-upper-rejection",
+        "active_candidate": f"{DAY_COMPACT}-{TAG[-8:]}-btc-{LONG_SETUP_TYPE.lower()}-lower-reclaim | {DAY_COMPACT}-{TAG[-8:]}-btc-{SHORT_SETUP_TYPE.lower()}-upper-rejection",
         "now_action": "WAIT_NOW",
-        "next_valid_plan": "ARMED_SHORT_ONLY",
+        "next_valid_plan": "ARMED_BOTH_SIDES" if LONG_VALID else "ARMED_SHORT_ONLY",
         "data_quality": "B",
         "key_data_gap": "labelled CEX wallet netflow and true provider liquidation heatmap unavailable"
     }
@@ -777,8 +839,8 @@ def write_state_and_ledger(report_path: Path) -> None:
     if f'"setup_id": "{setup_id}"' not in existing:
         event = {
             "timestamp_bjt": D["retrieved_bjt"], "event_type": "CANDIDATE", "setup_id": setup_id,
-            "asset": "BTC", "direction": "SHORT", "setup_type": "S5", "setup_subtype": "RANGE_EDGE_REJECTION",
-            "rule_version": "crypto-macro-daily-review-s1-s5-dynamic-rr-v1", "regime": "HTF_RANGE_RANGE_MIDDLE_UPPER_HALF",
+            "asset": "BTC", "direction": "SHORT", "setup_type": SHORT_SETUP_TYPE, "setup_subtype": SHORT_SETUP_SUBTYPE,
+            "rule_version": "crypto-macro-daily-review-s1-s5-dynamic-rr-v1", "regime": BTC_REGIME_LABEL,
             "model_status": "ARMED", "entry_method": "CONDITIONAL_LIMIT_PROBE", "ideal_entry": SHORT_IDEAL,
             "max_entry": SHORT_MAX, "stop": SHORT_STOP, "first_obstacle": SHORT_TP1, "tp2": SHORT_TP2,
             "gross_rr_obstacle": round((SHORT_MAX - SHORT_TP1) / (SHORT_STOP - SHORT_MAX), 3),
@@ -788,13 +850,34 @@ def write_state_and_ledger(report_path: Path) -> None:
             "model_allowed_risk_pct": 0.10, "risk_mode": "BOOTSTRAP_CALIBRATION", "correlation_cluster": "BTC_CORE",
             "entry_expiry": f"{REPORT_DATE}T20:00:00+08:00", "data_quality": "B", "event_risk": "MEDIUM",
             "trigger": f"Short only: rebound into {SHORT_ENTRY_LO:.0f}-{SHORT_MAX:.0f}, fail back below VAH with lower high and weak Taker. Lower-edge long is invalid because TP1 net R:R is below threshold.",
-            "flow_confirmation_status": "REQUIRED_FOR_TRIGGER", "flow_mode": "S5_RANGE_EDGE_SWEEP_RECLAIM_OR_REJECTION",
+            "flow_confirmation_status": "REQUIRED_FOR_TRIGGER", "flow_mode": SHORT_FLOW_MODE,
             "structural_zone_id": f"BTC-5D-VALUE-{DAY_COMPACT}-{TAG[-8:]}", "structural_zone_status": "VALID", "attempt_id": "attempt01",
             "attempt_status": "NOT_STARTED", "fresh_trigger_id": None, "attempt_count": 0, "rearm_eligible": True,
             "counterfactual_status": "NOT_APPLICABLE"
         }
         with ledger.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+            if LONG_VALID:
+                long_setup_id = f"{DAY_COMPACT}-{TAG[-8:]}-btc-{LONG_SETUP_TYPE.lower()}-lower-reclaim"
+                long_event = {
+                    "timestamp_bjt": D["retrieved_bjt"], "event_type": "CANDIDATE", "setup_id": long_setup_id,
+                    "asset": "BTC", "direction": "LONG", "setup_type": LONG_SETUP_TYPE, "setup_subtype": "LIQUIDITY_SWEEP_RECLAIM",
+                    "rule_version": "crypto-macro-daily-review-s1-s5-dynamic-rr-v1", "regime": BTC_REGIME_LABEL,
+                    "model_status": "ARMED", "entry_method": "CONDITIONAL_LIMIT_PROBE", "ideal_entry": LONG_IDEAL,
+                    "max_entry": LONG_MAX, "stop": LONG_STOP, "first_obstacle": LONG_TP1, "tp2": LONG_TP2,
+                    "gross_rr_obstacle": round((LONG_TP1 - LONG_MAX) / (LONG_MAX - LONG_STOP), 3),
+                    "gross_rr_tp2": round((LONG_TP2 - LONG_MAX) / (LONG_MAX - LONG_STOP), 3),
+                    "net_rr_obstacle": round(LONG_RR1, 3), "net_rr_tp2": round(LONG_RR2, 3), "weighted_net_rr": round(LONG_WEIGHTED_RR, 3),
+                    "estimated_fee_rate": 0.0008, "estimated_slippage_rate": 0.0004,
+                    "model_allowed_risk_pct": 0.10, "risk_mode": "BOOTSTRAP_CALIBRATION", "correlation_cluster": "BTC_CORE",
+                    "entry_expiry": f"{REPORT_DATE}T20:00:00+08:00", "data_quality": "B", "event_risk": "MEDIUM",
+                    "trigger": f"Long only: sweep below VAL {BTC_VAL:.0f}, reclaim it on 15m/30m and form HL with weakening sell pressure.",
+                    "flow_confirmation_status": "REQUIRED_FOR_TRIGGER", "flow_mode": "S1_LIQUIDITY_SWEEP_RECLAIM",
+                    "structural_zone_id": f"BTC-5D-VALUE-{DAY_COMPACT}-{TAG[-8:]}-LOWER", "structural_zone_status": "VALID", "attempt_id": "attempt01",
+                    "attempt_status": "NOT_STARTED", "fresh_trigger_id": None, "attempt_count": 0, "rearm_eligible": True,
+                    "counterfactual_status": "NOT_APPLICABLE"
+                }
+                handle.write(json.dumps(long_event, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":

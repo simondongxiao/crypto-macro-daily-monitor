@@ -6,6 +6,8 @@ on:
     # Run five minutes after the top of the hour to reduce scheduled-run congestion.
     - cron: "5 23 * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [crypto_daily_external_trigger]
 
 concurrency:
   # This workflow and price_monitor.yml both write main/config state.

@@ -38,6 +38,25 @@ def make_research_inputs(data_path: Path) -> tuple[Path, Path]:
     tag = NOW.strftime("%H%M%S")
     supplement = json.loads((BUNDLE / "templates" / "research_supplement_template.json").read_text(encoding="utf-8"))
     supplement["snapshot_bjt"] = stamp
+    # Reconcile known scheduled releases against the current snapshot. These
+    # outcomes were verified from the official BLS releases; they must not
+    # remain a stale "待公布" event after their release window has passed.
+    verified_outcomes = {
+        "US September CPI": {
+            "classification": "Event Outcome",
+            "incremental_change": "已落地：CPI-U 9月环比 +0.6%，同比 +3.7%；能源价格上升是主要推动项。",
+            "source": "https://www.bls.gov/news.release/archives/cpi_10142026.htm",
+        },
+        "US September PPI": {
+            "classification": "Event Outcome",
+            "incremental_change": "已落地：最终需求PPI 9月环比 +1.3%，为2022年3月以来最大月度涨幅。",
+            "source": "https://www.bls.gov/news.release/archives/ppi_10152026.htm",
+        },
+    }
+    for event in supplement.get("catalysts", []):
+        outcome = verified_outcomes.get(event.get("event"))
+        if outcome:
+            event.update(outcome)
     supplement["options_derived"] = {
         "BTC_near_expiry": data.get("options", {}).get("BTC", {}).get("near_expiry"),
         "ETH_near_expiry": data.get("options", {}).get("ETH", {}).get("near_expiry"),
