@@ -1,17 +1,11 @@
 {
-  "run_id": "38831353879",
-  "workflow_event": "repository_dispatch",
-  "run_attempt": "1",
-  "planned_run_bjt": "2026-10-16T07:05:00+08:00",
-  "actual_run_bjt": "2026-10-16T08:46:24.693655+08:00",
-  "retrieved_bjt": "2026-10-16T08:46:24.981275+08:00",
+  "run_id": "38833744682",
   "report_date": "2026-10-16",
-  "generated_at_bjt": "2026-10-16T08:46:24.693655+08:00",
-  "report": "reports/crypto_macro_daily_2026-10-16_084624BJT.docx",
-  "html": "reports/crypto_macro_daily_2026-10-16_084624BJT.html",
-  "index_html": "reports/index.html",
-  "active_conditions": "config/active_conditions.json",
-  "generation_status": "SUCCESS",
+  "generated_at_bjt": "2026-10-16T09:11:29.925586+08:00",
+  "generation_status": "DUPLICATE_SKIP",
+  "reused_report": "reports/crypto_macro_daily_2026-10-16_084624BJT.docx",
+  "reused_html": "reports/crypto_macro_daily_2026-10-16_084624BJT.html",
+  "note": "A successful report already exists for this business date; no historical report was overwritten.",
   "data_sources": {
     "generated_at": "2026-10-16T08:46:24.981275+08:00",
     "fields": {
@@ -347,6 +341,6 @@
   "pages_url": "https://simondongxiao.github.io/crypto-macro-daily-monitor/",
   "notification_status": "ACCEPTED",
   "notification_code": 0,
-  "finalized_at_bjt": "2026-10-16T08:47:14.758706+08:00",
+  "finalized_at_bjt": "2026-10-16T09:11:40.787897+08:00",
   "final_status": "SUCCESS"
 }
