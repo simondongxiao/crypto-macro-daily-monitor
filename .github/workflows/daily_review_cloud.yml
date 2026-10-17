@@ -6,6 +6,12 @@ on:
     # Run five minutes after the top of the hour to reduce scheduled-run congestion.
     - cron: "5 23 * * *"
   workflow_dispatch:
+    inputs:
+      force_notify:
+        description: "Resend today's Feishu notification for manual acceptance testing"
+        required: false
+        default: false
+        type: boolean
   repository_dispatch:
     types: [crypto_daily_external_trigger]
 
@@ -77,8 +83,13 @@ jobs:
       - name: Notify Feishu
         run: |
           report=$(find reports -maxdepth 1 -name 'crypto_macro_daily_*.docx' -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
+          test -n "$report"
           business_date=$(TZ=Asia/Shanghai date +%F)
-          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --business-date "$business_date" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/"
+          report_name=$(basename "$report")
+          report_url="https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/main/reports/$report_name"
+          force_args=()
+          if [ "${{ inputs.force_notify }}" = "true" ]; then force_args+=(--force); fi
+          python github_skill/scripts/send_feishu.py --webhook "$FEISHU_WEBHOOK" --report "$report" --business-date "$business_date" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --html-url "https://simondongxiao.github.io/crypto-macro-daily-monitor/" --report-url "$report_url" "${force_args[@]}"
 
       - name: Finalize daily audit
         if: success()

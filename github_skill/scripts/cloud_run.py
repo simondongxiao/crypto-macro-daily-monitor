@@ -79,6 +79,24 @@ def make_research_inputs(data_path: Path) -> tuple[Path, Path]:
 
     views = json.loads((BUNDLE / "templates" / "verified_updates_template.json").read_text(encoding="utf-8"))
     views["cutoff_bjt"] = stamp
+    # The candidate monitor is run as part of the live fetch.  Do not let the
+    # report fall back to a stale hand-written key-person status when today's
+    # monitor has a fresh result.
+    monitor = data.get("key_person_monitor", {})
+    if monitor:
+        scan_status = monitor.get("scan_status")
+        validated = monitor.get("validated_updates") or []
+        views["status"] = "NEW_OR_CHANGED_VIEW" if validated else (
+            "NO_MATERIAL_CHANGE" if scan_status == "SUCCESS" else "DATA_COLLECTION_FAILED"
+        )
+        views["covered_universe"] = monitor.get("covered_people") or views.get("covered_universe", [])
+        views["candidate_count"] = monitor.get("candidate_count", 0)
+        views["updates"] = validated
+        views["primary_or_credible_checks"] = [{
+            "person": "Automated key-person candidate monitor",
+            "result": scan_status or "UNKNOWN",
+            "note": monitor.get("note", "")
+        }]
     views_path = BUNDLE / f"verified_updates_{NOW:%Y%m%d}_{tag}.json"
     views_path.write_text(json.dumps(views, ensure_ascii=False, indent=2), encoding="utf-8")
     return supplement_path, views_path

@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -31,6 +32,8 @@ def main() -> None:
     parser.add_argument("--report", required=True)
     parser.add_argument("--run-url", default="")
     parser.add_argument("--html-url", default="")
+    parser.add_argument("--report-url", default="")
+    parser.add_argument("--force", action="store_true", help="send even when this business date was already accepted")
     parser.add_argument("--business-date", default=datetime.now(BJT).date().isoformat())
     parser.add_argument("--dedupe-path", default="audit/feishu_daily.json")
     args = parser.parse_args()
@@ -41,7 +44,7 @@ def main() -> None:
     dedupe_path = Path(args.dedupe_path)
     if dedupe_path.name == "feishu_daily.json":
         dedupe_path = dedupe_path.with_name(f"feishu_daily_{args.business_date}.json")
-    if dedupe_path.exists():
+    if dedupe_path.exists() and not args.force:
         try:
             previous = json.loads(dedupe_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -53,27 +56,38 @@ def main() -> None:
         f"Crypto日报已生成\n"
         f"文件：{report.name}\n\n"
         f"今日结论：{extract_summary(report)}\n\n"
-        f"完整 Word 报告与历史 Artifact：{args.run_url or '请打开本次 GitHub Actions 运行记录'}"
+        f"手机阅读 HTML：{args.html_url or '链接未提供'}\n"
+        f"下载 Word 文件：{args.report_url or '链接未提供'}\n"
+        f"本次运行审计：{args.run_url or '请打开本次 GitHub Actions 运行记录'}"
     )
-    if args.html_url:
-        text += f"\n\n手机阅读 HTML：{args.html_url}"
-    response = requests.post(
-        args.webhook,
-        json={"msg_type": "text", "content": {"text": text}},
-        timeout=20,
-    )
-    response.raise_for_status()
-    try:
-        body = response.json()
-    except ValueError as error:
-        raise SystemExit(f"Feishu webhook returned non-JSON response: HTTP {response.status_code}") from error
-    if not isinstance(body, dict) or "code" not in body:
-        raise SystemExit(f"Feishu webhook response missing code: {json.dumps(body, ensure_ascii=False)}")
-    if body["code"] != 0:
-        raise SystemExit(f"Feishu webhook rejected request: {json.dumps(body, ensure_ascii=False)}")
+    payload = {"msg_type": "text", "content": {"text": text}}
+    body: dict[str, object] | None = None
+    last_error = ""
+    for attempt in range(1, 4):
+        try:
+            response = requests.post(args.webhook, json=payload, timeout=20)
+            response.raise_for_status()
+            try:
+                parsed = response.json()
+            except ValueError as error:
+                raise RuntimeError(f"non-JSON response: HTTP {response.status_code}") from error
+            if not isinstance(parsed, dict) or "code" not in parsed:
+                raise RuntimeError(f"response missing code: {json.dumps(parsed, ensure_ascii=False)}")
+            if parsed["code"] != 0:
+                raise RuntimeError(f"business rejection: {json.dumps(parsed, ensure_ascii=False)}")
+            body = parsed
+            print(f"Feishu webhook accepted: http={response.status_code}, code={parsed['code']}, attempt={attempt}")
+            break
+        except (requests.RequestException, RuntimeError) as error:
+            last_error = str(error)
+            print(f"Feishu webhook attempt {attempt}/3 failed: {last_error}")
+            if attempt < 3:
+                time.sleep(attempt * 3)
+    if body is None:
+        raise SystemExit(f"Feishu notification failed after 3 attempts: {last_error}")
     dedupe_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=dedupe_path.parent, delete=False) as handle:
-        json.dump({"business_date": args.business_date, "status": "ACCEPTED", "code": body["code"], "accepted_at_bjt": datetime.now(BJT).isoformat(), "report": report.name}, handle, ensure_ascii=False, indent=2)
+        json.dump({"business_date": args.business_date, "status": "ACCEPTED", "code": body["code"], "accepted_at_bjt": datetime.now(BJT).isoformat(), "report": report.name, "html_url": args.html_url, "report_url": args.report_url, "run_url": args.run_url}, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
         temporary = Path(handle.name)
     os.replace(temporary, dedupe_path)

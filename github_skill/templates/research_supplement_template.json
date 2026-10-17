@@ -9,40 +9,40 @@
   },
   "etf_flows_usd_m": [
     {
-      "date": "2026-10-01",
-      "BTC": 102.7,
-      "ETH": -55.4,
-      "SOL": -1.1
+      "date": "2026-10-09",
+      "BTC": 21.1,
+      "ETH": -56.1,
+      "SOL": -3.8
     },
     {
-      "date": "2026-10-02",
-      "BTC": 189.9,
-      "ETH": -37.4,
-      "SOL": 1.3
+      "date": "2026-10-12",
+      "BTC": -65.4,
+      "ETH": -85.4,
+      "SOL": -0.7
     },
     {
-      "date": "2026-10-05",
-      "BTC": -89.8,
-      "ETH": -50.8,
-      "SOL": -9.2
+      "date": "2026-10-13",
+      "BTC": 175.7,
+      "ETH": 24.8,
+      "SOL": -1.0
     },
     {
-      "date": "2026-10-06",
-      "BTC": -3.2,
-      "ETH": 0.0,
-      "SOL": -3.7
+      "date": "2026-10-14",
+      "BTC": -261.4,
+      "ETH": -129.5,
+      "SOL": -1.3
     },
     {
-      "date": "2026-10-07",
-      "BTC": 332.2,
-      "ETH": null,
-      "SOL": null
+      "date": "2026-10-15",
+      "BTC": 5.1,
+      "ETH": -60.3,
+      "SOL": -9.8
     }
   ],
   "etf_sources": {
-    "BTC": "https://www.cryptometer.io/etf",
-    "ETH": "https://alphafinance.io/etf/",
-    "SOL": "https://alphafinance.io/etf/"
+    "BTC": "https://farside.co.uk/btc/",
+    "ETH": "https://farside.co.uk/eth/",
+    "SOL": "https://farside.co.uk/sol/"
   },
   "options_derived": {
     "BTC_near_expiry": "13OCT26",
@@ -75,14 +75,14 @@
   "alt_fundamentals": {
     "AVAX": {
       "theme": "L1 / high-beta ecosystem",
-      "tvl_usd": 642517737,
-      "tvl_7d_pct": 1.85,
-      "dex_volume_7d_pct": -4.76,
+      "tvl_usd": 600370000,
+      "tvl_7d_pct": -38.58,
+      "dex_volume_7d_pct": -38.58,
       "fees_7d_pct": null,
-      "unlock": "Public unlock field not verified in this run; no standalone long plan",
+      "unlock": "2026-10-21: 3.584842m AVAX, about 0.5% of total supply / 0.7% of market cap; no standalone long plan",
       "sources": [
-        "https://api.llama.fi/v2/historicalChainTvl/avalanche",
-        "https://api.llama.fi/overview/dexs/avalanche"
+        "https://enterprise.defillama.com/chain/avalanche?events=false&holdersRevenue=true&tvl=false",
+        "https://app.tokenomics.com/tokenomics/avalanche/unlocks"
       ]
     },
     "XRP": {
@@ -166,10 +166,19 @@
       "event": "FOMC meeting and press conference",
       "classification": "Known Scheduled Event",
       "first_confirmed": "Federal Reserve 2026 calendar",
-      "incremental_change": "No change; next meeting October 27-28",
-      "time_bjt": "2026-10-29 around 02:00",
+      "incremental_change": "已确认：下一次会议为10月27-28日；声明与记者会仍是待公布结果",
+      "time_bjt": "2026-10-28 02:00",
       "assets": "BTC/ETH/SOL and rates",
       "source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+    },
+    {
+      "event": "AVAX scheduled unlock",
+      "classification": "Known Scheduled Event",
+      "first_confirmed": "Tokenomics.com unlock schedule",
+      "incremental_change": "新增近7日供给风险：约3.584842m AVAX，约占总供应0.5%、市值0.7%",
+      "time_bjt": "2026-10-21",
+      "assets": "AVAX / L1 beta",
+      "source": "https://app.tokenomics.com/tokenomics/avalanche/unlocks"
     },
     {
       "event": "US advance Q3 GDP and September PCE",
