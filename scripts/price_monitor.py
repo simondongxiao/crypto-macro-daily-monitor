@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,7 +24,8 @@ BINANCE_URLS = (
     "https://api4.binance.com/api/v3/ticker/price",
 )
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
-OKX_URL = "https://www.okx.com/api/v5/market/tickers"
+COINBASE_URL = "https://api.exchange.coinbase.com/products/{product}/ticker"
+OKX_URL = "https://www.okx.com/api/v5/market/ticker"
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
 ASSET_NAMES = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL"}
 MAX_QUOTE_AGE_SECONDS = 300
@@ -96,12 +98,33 @@ def fetch_prices(session: requests.Session, captured_at: datetime) -> tuple[dict
         failures.append(f"{COINGECKO_URL}: {error}")
 
     try:
-        response = session.get(OKX_URL, params=[("instType", "SWAP"), ("instId", "BTC-USDT-SWAP"), ("instId", "ETH-USDT-SWAP"), ("instId", "SOL-USDT-SWAP")], timeout=15)
-        response.raise_for_status()
-        rows = response.json()["data"]
-        by_symbol = {row["instId"].replace("-USDT-SWAP", "USDT"): row for row in rows}
-        prices = {symbol: float(by_symbol[symbol]["last"]) for symbol in SYMBOLS}
-        timestamps = {symbol: datetime.fromtimestamp(float(by_symbol[symbol]["ts"]) / 1000, tz=BJT).isoformat() if by_symbol[symbol].get("ts") else None for symbol in SYMBOLS}
+        prices: dict[str, float] = {}
+        timestamps: dict[str, str | None] = {}
+        for symbol in SYMBOLS:
+            product = f"{symbol[:-4]}-USD"
+            response = session.get(COINBASE_URL.format(product=product), timeout=10)
+            response.raise_for_status()
+            row = response.json()
+            prices[symbol] = float(row["price"])
+            timestamp = row.get("time")
+            timestamps[symbol] = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(BJT).isoformat() if timestamp else None
+        quotes["Coinbase Spot ticker"] = _quote_record("Coinbase Spot ticker", captured_at, prices, timestamps)
+    except (requests.RequestException, KeyError, TypeError, ValueError) as error:
+        failures.append(f"{COINBASE_URL}: {error}")
+
+    try:
+        prices: dict[str, float] = {}
+        timestamps: dict[str, str | None] = {}
+        for symbol in SYMBOLS:
+            inst_id = f"{symbol[:-4]}-USDT-SWAP"
+            response = session.get(OKX_URL, params={"instType": "SWAP", "instId": inst_id}, timeout=10)
+            response.raise_for_status()
+            rows = response.json()["data"]
+            if not rows:
+                raise RuntimeError(f"empty OKX response for {inst_id}")
+            row = rows[0]
+            prices[symbol] = float(row["last"])
+            timestamps[symbol] = datetime.fromtimestamp(float(row["ts"]) / 1000, tz=BJT).isoformat() if row.get("ts") else None
         quotes["OKX Swap ticker"] = _quote_record("OKX Swap ticker", captured_at, prices, timestamps)
     except (requests.RequestException, KeyError, TypeError, ValueError) as error:
         failures.append(f"{OKX_URL}: {error}")
@@ -147,17 +170,28 @@ def send_feishu(session: requests.Session, webhook: str, symbol: str, side: str,
             {"tag": "note", "elements": [{"tag": "plain_text", "content": f"报价源：{price_source}；已通过独立源偏差与过期检查。请以 Daily Review 的 SL、TP、Max Entry 和失效条件为准。"}]},
         ],
     }
-    response = session.post(webhook, json={"msg_type": "interactive", "card": card}, timeout=15)
-    response.raise_for_status()
-    try:
-        body = response.json()
-    except ValueError as error:
-        raise RuntimeError(f"Feishu returned non-JSON response: HTTP {response.status_code}") from error
-    if not isinstance(body, dict) or "code" not in body:
-        raise RuntimeError(f"Feishu response missing code: {body}")
-    if body.get("code") != 0:
-        raise RuntimeError(f"Feishu rejected card: {body}")
-    return body
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            response = session.post(webhook, json={"msg_type": "interactive", "card": card}, timeout=15)
+            if 500 <= response.status_code < 600:
+                raise RuntimeError(f"Feishu temporary HTTP error: {response.status_code}")
+            response.raise_for_status()
+            try:
+                body = response.json()
+            except ValueError as error:
+                raise RuntimeError(f"Feishu returned non-JSON response: HTTP {response.status_code}") from error
+            if not isinstance(body, dict) or "code" not in body:
+                raise RuntimeError(f"Feishu response missing code: {body}")
+            if body.get("code") != 0:
+                raise RuntimeError(f"Feishu rejected card: {body}")
+            return body
+        except (requests.RequestException, RuntimeError) as error:
+            last_error = error
+            if attempt == 3:
+                break
+            time.sleep(2 ** (attempt - 1))
+    raise RuntimeError(f"Feishu send failed after 3 attempts: {last_error}")
 
 
 def atomic_write(path: Path, payload: dict[str, Any]) -> None:
@@ -253,7 +287,21 @@ def main() -> None:
                 notification_failed = True
 
     status = "STALE_CONFIG" if stale else "NOTIFICATION_FAILED" if notification_failed else "ALERT_SENT" if changed else "NO_TRIGGER"
-    record = {"query_time_bjt": now.isoformat(), "config_date": payload.get("date"), "status": status, "price_source": price_source, "source_failures": source_failures, "prices": prices, "source_quotes": source_quotes, "price_validity": price_validity, "evaluations": evaluations, "notifications": notifications}
+    record = {
+        "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+        "workflow_event": os.environ.get("GITHUB_EVENT_NAME"),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "query_time_bjt": now.isoformat(),
+        "config_date": payload.get("date"),
+        "status": status,
+        "price_source": price_source,
+        "source_failures": source_failures,
+        "prices": prices,
+        "source_quotes": source_quotes,
+        "price_validity": price_validity,
+        "evaluations": evaluations,
+        "notifications": notifications,
+    }
     write_audit(audit_path, record)
     print(f"MONITOR_RESULT status={status} audit={audit_path}")
     if notification_failed:

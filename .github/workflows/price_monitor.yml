@@ -2,9 +2,12 @@ name: Crypto Price Monitor to Feishu
 
 on:
   schedule:
-    # GitHub cron uses UTC. This runs roughly every 10 minutes.
-    - cron: "*/10 * * * *"
+    # GitHub cron uses UTC. Five minutes is the shortest practical polling
+    # interval, but scheduled runs remain best-effort on GitHub-hosted runners.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [crypto_price_monitor_external_trigger]
 
 permissions:
   contents: write
