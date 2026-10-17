@@ -23,7 +23,7 @@ cron-job.org 支持自定义时区、POST 请求、自定义 Header 和 JSON bod
 - URL：`https://api.github.com/repos/simondongxiao/crypto-macro-daily-monitor/dispatches`
 - Request method：`POST`
 - Timezone：`Asia/Shanghai`
-- Schedule：每天 `07:05`
+- Schedule：每天 `07:00`
 - Header：
   - `Accept: application/vnd.github+json`
   - `Authorization: Bearer <你的 Fine-grained Token>`
@@ -35,7 +35,7 @@ cron-job.org 支持自定义时区、POST 请求、自定义 Header 和 JSON bod
   "event_type": "crypto_daily_external_trigger",
   "client_payload": {
     "source": "cron-job.org",
-    "scheduled_for": "07:05 Asia/Shanghai"
+    "scheduled_for": "07:00 Asia/Shanghai"
   }
 }
 ```
@@ -65,4 +65,4 @@ Invoke-RestMethod `
 4. `Notify Feishu` 成功；
 5. 同一业务日期再次触发时显示去重或跳过，不新增重复日报。
 
-如果外部服务本身延迟，GitHub 原生 07:05 cron 仍可作为第二入口；两个入口共享同一业务日期去重和 Feishu 去重状态。
+如果外部服务本身延迟，GitHub 原生 07:05 cron 仍可作为第二入口；两个入口共享同一业务日期去重和 Feishu 去重状态。外部服务触发后，GitHub 的事件创建和 Runner 启动仍可能有短暂排队，但不会再依赖 GitHub 的 Scheduled 事件队列。
