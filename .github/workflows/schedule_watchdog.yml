@@ -2,9 +2,9 @@ name: Crypto Schedule Watchdog
 
 on:
   schedule:
-    # 23:35 UTC = 07:35 BJT. This is a compensation check, not a replacement
-    # for the existing 23:05 UTC daily schedule.
-    - cron: "35 23 * * *"
+    # 21:33 UTC = 05:33 BJT. This is a compensation check, not a replacement
+    # for the existing 21:03 UTC daily schedule.
+    - cron: "33 21 * * *"
   workflow_dispatch:
 
 permissions:

@@ -2,9 +2,9 @@ name: Crypto Daily Review (Cloud)
 
 on:
   schedule:
-    # 23:00 UTC = 07:00 Asia/Shanghai on the following day.
-    # Run five minutes after the top of the hour to reduce scheduled-run congestion.
-    - cron: "5 23 * * *"
+    # 21:03 UTC = 05:03 Asia/Shanghai on the following day.
+    # Keep the fallback away from the top of the hour and GitHub's busiest window.
+    - cron: "3 21 * * *"
   workflow_dispatch:
     inputs:
       force_notify:

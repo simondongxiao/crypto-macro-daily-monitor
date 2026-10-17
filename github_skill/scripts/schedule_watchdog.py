@@ -53,7 +53,7 @@ def current_business_notification(date_text: str) -> dict[str, Any] | None:
 
 def expected_daily_windows(now: datetime) -> list[datetime]:
     return [
-        datetime.combine((now.date() - timedelta(days=offset + 1)), datetime.min.time(), tzinfo=UTC).replace(hour=23, minute=5)
+        datetime.combine((now.date() - timedelta(days=offset + 1)), datetime.min.time(), tzinfo=UTC).replace(hour=21, minute=3)
         for offset in range(7)
     ]
 

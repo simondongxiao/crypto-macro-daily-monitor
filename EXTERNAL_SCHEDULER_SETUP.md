@@ -2,7 +2,7 @@
 
 本仓库的日报工作流同时支持三种入口：
 
-- GitHub 原生 `schedule`：北京时间 07:05，作为兜底。
+- GitHub 原生 `schedule`：北京时间 05:03，作为兜底。
 - GitHub `workflow_dispatch`：人工测试入口。
 - GitHub `repository_dispatch`：外部定时器正式入口，事件类型为 `crypto_daily_external_trigger`。
 
@@ -65,4 +65,4 @@ Invoke-RestMethod `
 4. `Notify Feishu` 成功；
 5. 同一业务日期再次触发时显示去重或跳过，不新增重复日报。
 
-如果外部服务本身延迟，GitHub 原生 07:05 cron 仍可作为第二入口；两个入口共享同一业务日期去重和 Feishu 去重状态。外部服务触发后，GitHub 的事件创建和 Runner 启动仍可能有短暂排队，但不会再依赖 GitHub 的 Scheduled 事件队列。
+如果外部服务本身延迟，GitHub 原生 05:03 cron 仍可作为第二入口；两个入口共享同一业务日期去重和 Feishu 去重状态。外部服务触发后，GitHub 的事件创建和 Runner 启动仍可能有短暂排队，但不会再依赖 GitHub 的 Scheduled 事件队列。
