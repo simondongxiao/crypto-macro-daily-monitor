@@ -8,7 +8,7 @@
         82163.81
       ],
       "alerted_long": false,
-      "alerted_short": false
+      "alerted_short": true
     },
     "ETHUSDT": {
       "long_zone": [],
@@ -23,5 +23,11 @@
       "alerted_short": false
     }
   },
-  "sent_alerts": {}
+  "sent_alerts": {
+    "2026-10-19:BTCUSDT:short:81983.81,82163.81": {
+      "status": "ACCEPTED",
+      "sent_at_bjt": "2026-10-19T07:57:33.208137+08:00",
+      "source": "CoinGecko"
+    }
+  }
 }
