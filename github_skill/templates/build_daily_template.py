@@ -168,7 +168,10 @@ for asset in ("BTC", "ETH", "SOL"):
         "details": details,
     }
 
-TURNING = analyze_turning_points(D["derivatives"]["BTC"]["klines4h"][:-1])
+TURNING = {
+    asset: analyze_turning_points(D["derivatives"][asset]["klines4h"][:-1])
+    for asset in ("BTC", "ETH", "SOL")
+}
 
 
 def net_rr(entry: float, stop: float, target: float, side: str, cost_rate: float = 0.0012) -> float:
@@ -504,7 +507,7 @@ def make_document() -> Path:
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.paragraph_format.space_after = Pt(2)
-    configure_run(title.add_run("加密宏观每日复盘"), size=21, bold=True, color=RGBColor(31, 78, 121))
+    configure_run(title.add_run(f"加密宏观每日复盘 - {REPORT_DATE} {D['retrieved_bjt'][11:16]} BJT"), size=21, bold=True, color=RGBColor(31, 78, 121))
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     subtitle.paragraph_format.space_after = Pt(8)
@@ -539,26 +542,56 @@ def make_document() -> Path:
 
     heading(doc, "阶段顶底雷达（Shadow）", 3)
     turning_rows = []
-    for horizon in ("24h", "72h", "7d"):
-        m = TURNING["horizons"][horizon]
-        envelope = m.get("statistical_envelope", {}).get("one_sigma", [P["BTC"]["low"], P["BTC"]["high"]])
-        low_band = m.get("conditional_low_band", [P["BTC"]["val"], P["BTC"]["poc"]])
-        high_band = m.get("conditional_high_band", [P["BTC"]["poc"], P["BTC"]["vah"]])
-        share = m.get("scenario_share", {"BOTTOM_REBOUND_FIRST": 0.0, "TOP_REVERSAL_FIRST": 0.0, "NO_DIRECTIONAL_TURN": 1.0})
-        wash = m.get("diagnostic_share", {}).get("two_way_wash", 0.0)
-        turning_rows.append([
-            horizon,
-            f"{envelope[0]:,.0f}-{envelope[1]:,.0f}",
-            f"{low_band[0]:,.0f}-{low_band[-1]:,.0f}",
-            f"{high_band[0]:,.0f}-{high_band[-1]:,.0f}",
-            f"{share['BOTTOM_REBOUND_FIRST']*100:.1f}% / {share['TOP_REVERSAL_FIRST']*100:.1f}% / {share['NO_DIRECTIONAL_TURN']*100:.1f}%",
-            f"{wash*100:.1f}%",
-            f"{m.get('effective_n', 0.0):.1f}",
-            "SHADOW_UNCALIBRATED",
-        ])
-    table(doc, ["窗口", "统计±1σ", "条件底带", "条件顶带", "历史近邻：底/顶/无", "双向洗盘", "有效N", "状态"], turning_rows, font=6.6)
-    radar_long = f"下沿是否扫过 VAL {BTC_VAL:,.0f} 后收回形成 HL，以及" if LONG_VALID else "下沿多头本轮已因 R:R 闸门淘汰，"
-    paragraph(doc, f"这不是胜率。当前统计带只用于说明波动范围，不能把某一个点位当成绝对顶部。今天要观察{radar_long}上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否冲高失败形成 LH；现价不属于执行区。")
+    radar_notes = []
+    for asset in ("BTC", "ETH", "SOL"):
+        asset_turning = TURNING[asset]
+        decimals = 0 if asset in ("BTC", "ETH") else 2
+        mark = float(D["derivatives"][asset]["mark"])
+        regime = f"{REGIMES[asset]['htf']} + {REGIMES[asset]['execution']}"
+        for horizon in ("24h", "72h", "7d"):
+            m = asset_turning.get("horizons", {}).get(horizon, {})
+            envelope = m.get("statistical_envelope", {}).get("one_sigma")
+            low_band = m.get("conditional_low_band")
+            high_band = m.get("conditional_high_band")
+            share = m.get("scenario_share", {})
+            wash = m.get("diagnostic_share", {}).get("two_way_wash")
+            status = m.get("status", asset_turning.get("status", "UNAVAILABLE"))
+            if not envelope or not low_band or not high_band:
+                turning_rows.append([asset, horizon, regime, "UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE", "N/A", "N/A", "N/A", status, "数据不足，不能推断顶部/底部"])
+                continue
+            low_min, low_max = min(low_band), max(low_band)
+            high_min, high_max = min(high_band), max(high_band)
+            if mark > high_max:
+                relation = f"现价 {mark:,.{decimals}f} > 顶带 {high_max:,.{decimals}f}；EXTENSION，非确认顶部"
+            elif mark < low_min:
+                relation = f"现价 {mark:,.{decimals}f} < 底带 {low_min:,.{decimals}f}；EXTENSION，非确认底部"
+            elif mark >= high_min:
+                relation = f"现价 {mark:,.{decimals}f} 进入条件顶带"
+            elif mark <= low_max:
+                relation = f"现价 {mark:,.{decimals}f} 进入条件底带"
+            else:
+                relation = f"现价 {mark:,.{decimals}f} 位于条件带之间"
+            share_text = " / ".join(
+                f"{(share.get(key) * 100):.1f}%" if share.get(key) is not None else "N/A"
+                for key in ("BOTTOM_REBOUND_FIRST", "TOP_REVERSAL_FIRST", "NO_DIRECTIONAL_TURN")
+            )
+            turning_rows.append([
+                asset,
+                horizon,
+                regime,
+                f"{envelope[0]:,.{decimals}f}-{envelope[1]:,.{decimals}f}",
+                f"{low_min:,.{decimals}f}-{low_max:,.{decimals}f}",
+                f"{high_min:,.{decimals}f}-{high_max:,.{decimals}f}",
+                share_text,
+                f"{wash * 100:.1f}%" if wash is not None else "N/A",
+                f"{m.get('effective_n', 0.0):.1f}",
+                status,
+                relation,
+            ])
+        radar_notes.append(f"{asset} 当前 {mark:,.{decimals}f}，独立使用自身的24h/72h/7d区间")
+    table(doc, ["资产", "窗口", "趋势Regime", "统计±1σ", "条件底带", "条件顶带", "历史近邻：底/顶/无", "双向洗盘", "有效N", "状态", "当前相对位置"], turning_rows, font=5.2)
+    radar_long = f"BTC 下沿是否扫过 VAL {BTC_VAL:,.0f} 后收回形成 HL，以及上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否冲高失败形成 LH" if not LONG_VALID else f"BTC 下沿是否扫过 VAL {BTC_VAL:,.0f} 后收回形成 HL，以及上沿 {SHORT_ENTRY_LO:,.0f}-{SHORT_MAX:,.0f} 是否冲高失败形成 LH"
+    paragraph(doc, f"这不是胜率。统计±1σ只是各资产自身的正常波动范围，条件顶带/底带是历史相似路径的候选反转区域；现价越过条件顶带时，只能标记为延伸段，不能单独做空，反之亦然。7d若有效N为0或状态未校准，不能用于预测。{ '；'.join(radar_notes) }。BTC今天仍要等{radar_long}，ETH/SOL雷达只用于各自阶段判断，不自动生成交易卡。")
 
     heading(doc, "今日交易台")
     table(doc, ["标的", "Bias", "Location", "Regime", "交易含义"], [
