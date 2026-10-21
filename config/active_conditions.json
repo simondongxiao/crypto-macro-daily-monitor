@@ -12,7 +12,7 @@
         85600.0
       ],
       "alerted_long": false,
-      "alerted_short": true
+      "alerted_short": false
     },
     "ETHUSDT": {
       "long_zone": [
@@ -24,7 +24,7 @@
         2555.0
       ],
       "alerted_long": false,
-      "alerted_short": true
+      "alerted_short": false
     },
     "SOLUSDT": {
       "long_zone": [
@@ -35,7 +35,7 @@
         109.3,
         109.8
       ],
-      "alerted_long": true,
+      "alerted_long": false,
       "alerted_short": false
     }
   },
