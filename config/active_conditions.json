@@ -12,7 +12,7 @@
         84450.0
       ],
       "alerted_long": false,
-      "alerted_short": false
+      "alerted_short": true
     },
     "ETHUSDT": {
       "long_zone": [
@@ -24,7 +24,7 @@
         2515.0
       ],
       "alerted_long": false,
-      "alerted_short": false
+      "alerted_short": true
     },
     "SOLUSDT": {
       "long_zone": [
@@ -43,6 +43,16 @@
     "2026-10-21:SOLUSDT:long:105.85,106.25": {
       "status": "ACCEPTED",
       "sent_at_bjt": "2026-10-21T13:21:59.979524+08:00",
+      "source": "CoinGecko"
+    },
+    "2026-10-21:BTCUSDT:short:84200.0,84450.0": {
+      "status": "ACCEPTED",
+      "sent_at_bjt": "2026-10-21T23:29:39.824376+08:00",
+      "source": "CoinGecko"
+    },
+    "2026-10-21:ETHUSDT:short:2495.0,2515.0": {
+      "status": "ACCEPTED",
+      "sent_at_bjt": "2026-10-21T23:29:39.824376+08:00",
       "source": "CoinGecko"
     }
   }
