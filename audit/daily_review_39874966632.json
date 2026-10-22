@@ -342,5 +342,11 @@
       "estimated_or_derived_count": 7
     },
     "guardrail": "A successful report only means the document build completed; field-level availability and freshness are recorded separately."
-  }
+  },
+  "pages_deployment_status": "SUCCESS",
+  "pages_url": "https://simondongxiao.github.io/crypto-macro-daily-monitor/",
+  "notification_status": "ACCEPTED",
+  "notification_code": 0,
+  "finalized_at_bjt": "2026-10-23T07:57:09.802668+08:00",
+  "final_status": "SUCCESS"
 }
