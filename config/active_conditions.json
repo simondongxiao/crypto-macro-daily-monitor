@@ -1,13 +1,13 @@
 {
-  "date": "2026-10-23",
+  "date": "2026-10-24",
   "assets": {
     "BTCUSDT": {
-      "long_zone": [
-        81286.3,
-        81436.3
+      "long_zone": [],
+      "short_zone": [
+        82949.81,
+        83129.81
       ],
-      "short_zone": [],
-      "alerted_long": true,
+      "alerted_long": false,
       "alerted_short": false
     },
     "ETHUSDT": {
@@ -23,26 +23,5 @@
       "alerted_short": false
     }
   },
-  "sent_alerts": {
-    "2026-10-21:SOLUSDT:long:105.85,106.25": {
-      "status": "ACCEPTED",
-      "sent_at_bjt": "2026-10-21T13:21:59.979524+08:00",
-      "source": "CoinGecko"
-    },
-    "2026-10-21:BTCUSDT:short:84200.0,84450.0": {
-      "status": "ACCEPTED",
-      "sent_at_bjt": "2026-10-21T23:29:39.824376+08:00",
-      "source": "CoinGecko"
-    },
-    "2026-10-21:ETHUSDT:short:2495.0,2515.0": {
-      "status": "ACCEPTED",
-      "sent_at_bjt": "2026-10-21T23:29:39.824376+08:00",
-      "source": "CoinGecko"
-    },
-    "2026-10-23:BTCUSDT:long:81286.3,81436.3": {
-      "status": "ACCEPTED",
-      "sent_at_bjt": "2026-10-23T09:35:05.769649+08:00",
-      "source": "CoinGecko"
-    }
-  }
+  "sent_alerts": {}
 }
