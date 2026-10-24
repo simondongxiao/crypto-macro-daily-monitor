@@ -11,7 +11,7 @@
         82750.0,
         83000.0
       ],
-      "alerted_long": false,
+      "alerted_long": true,
       "alerted_short": false
     },
     "ETHUSDT": {
@@ -39,5 +39,11 @@
       "alerted_short": false
     }
   },
-  "sent_alerts": {}
+  "sent_alerts": {
+    "2026-10-24:BTCUSDT:long:79950.0,80150.0": {
+      "status": "ACCEPTED",
+      "sent_at_bjt": "2026-10-24T22:49:52.625597+08:00",
+      "source": "CoinGecko"
+    }
+  }
 }
