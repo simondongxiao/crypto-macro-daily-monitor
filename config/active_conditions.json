@@ -1,24 +1,40 @@
 {
   "date": "2026-10-24",
+  "generated_at_bjt": "2026-10-24T08:36:48.862363+08:00",
   "assets": {
     "BTCUSDT": {
-      "long_zone": [],
+      "long_zone": [
+        79950.0,
+        80150.0
+      ],
       "short_zone": [
-        82949.81,
-        83129.81
+        82750.0,
+        83000.0
       ],
       "alerted_long": false,
       "alerted_short": false
     },
     "ETHUSDT": {
-      "long_zone": [],
-      "short_zone": [],
+      "long_zone": [
+        2332.0,
+        2338.0
+      ],
+      "short_zone": [
+        2468.0,
+        2490.0
+      ],
       "alerted_long": false,
       "alerted_short": false
     },
     "SOLUSDT": {
-      "long_zone": [],
-      "short_zone": [],
+      "long_zone": [
+        99.9,
+        100.3
+      ],
+      "short_zone": [
+        105.8,
+        106.2
+      ],
       "alerted_long": false,
       "alerted_short": false
     }
