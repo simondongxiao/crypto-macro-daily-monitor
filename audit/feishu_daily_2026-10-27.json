@@ -1,0 +1,10 @@
+{
+  "business_date": "2026-10-27",
+  "status": "ACCEPTED",
+  "code": 0,
+  "accepted_at_bjt": "2026-10-27T08:18:54.214685+08:00",
+  "report": "crypto_macro_daily_2026-10-27_081804BJT.docx",
+  "html_url": "https://simondongxiao.github.io/crypto-macro-daily-monitor/",
+  "report_url": "https://github.com/simondongxiao/crypto-macro-daily-monitor/raw/refs/heads/main/reports/crypto_macro_daily_2026-10-27_081804BJT.docx",
+  "run_url": "https://github.com/simondongxiao/crypto-macro-daily-monitor/actions/runs/40425481070"
+}
