@@ -10,7 +10,7 @@
         81491.07,
         81671.07
       ],
-      "alerted_long": false,
+      "alerted_long": true,
       "alerted_short": false
     },
     "ETHUSDT": {
@@ -26,5 +26,11 @@
       "alerted_short": false
     }
   },
-  "sent_alerts": {}
+  "sent_alerts": {
+    "2026-11-01:BTCUSDT:long:77457.95,77607.95": {
+      "status": "ACCEPTED",
+      "sent_at_bjt": "2026-11-01T08:27:12.565672+08:00",
+      "source": "CoinGecko"
+    }
+  }
 }
