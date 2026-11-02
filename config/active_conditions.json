@@ -1,16 +1,13 @@
 {
-  "date": "2026-11-01",
+  "date": "2026-11-02",
   "assets": {
     "BTCUSDT": {
-      "long_zone": [
-        77457.95,
-        77607.95
-      ],
+      "long_zone": [],
       "short_zone": [
-        81491.07,
-        81671.07
+        79228.59,
+        79408.59
       ],
-      "alerted_long": true,
+      "alerted_long": false,
       "alerted_short": false
     },
     "ETHUSDT": {
@@ -26,11 +23,5 @@
       "alerted_short": false
     }
   },
-  "sent_alerts": {
-    "2026-11-01:BTCUSDT:long:77457.95,77607.95": {
-      "status": "ACCEPTED",
-      "sent_at_bjt": "2026-11-01T08:27:12.565672+08:00",
-      "source": "CoinGecko"
-    }
-  }
+  "sent_alerts": {}
 }
