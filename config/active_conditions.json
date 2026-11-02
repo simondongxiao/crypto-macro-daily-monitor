@@ -1,12 +1,9 @@
 {
-  "date": "2026-11-02",
-  "generated_at_bjt": "2026-11-02T07:54:17.426575+08:00",
+  "date": "2026-11-03",
+  "generated_at_bjt": "2026-11-03T07:46:37.405508+08:00",
   "assets": {
     "BTCUSDT": {
-      "long_zone": [
-        75700.0,
-        76100.0
-      ],
+      "long_zone": [],
       "short_zone": [],
       "alerted_long": false,
       "alerted_short": false
@@ -18,10 +15,7 @@
       "alerted_short": false
     },
     "SOLUSDT": {
-      "long_zone": [
-        92.7,
-        93.2
-      ],
+      "long_zone": [],
       "short_zone": [
         97.35,
         97.7
