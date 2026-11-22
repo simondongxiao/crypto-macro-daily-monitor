@@ -1,11 +1,11 @@
 {
-  "date": "2026-11-21",
+  "date": "2026-11-22",
   "assets": {
     "BTCUSDT": {
       "long_zone": [],
       "short_zone": [
-        64687.98,
-        64867.98
+        62877.32,
+        63057.32
       ],
       "alerted_long": false,
       "alerted_short": false
