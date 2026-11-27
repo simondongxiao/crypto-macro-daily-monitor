@@ -1,0 +1,340 @@
+{
+  "run_id": "45935720309",
+  "report_date": "2026-11-27",
+  "generated_at_bjt": "2026-11-27T11:42:51.116337+08:00",
+  "generation_status": "DUPLICATE_SKIP",
+  "reused_report": "reports/crypto_macro_daily_2026-11-27_113332BJT.docx",
+  "reused_html": "reports/crypto_macro_daily_2026-11-27_113332BJT.html",
+  "note": "A successful report already exists for this business date; no historical report was overwritten.",
+  "data_sources": {
+    "generated_at": "2026-11-27T11:33:32.409322+08:00",
+    "fields": {
+      "derivatives.BTC.mark": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:32.409325+08:00",
+        "data_timestamp": "2026-11-27T11:33:33.062000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.BTC.funding": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:32.409325+08:00",
+        "data_timestamp": "2026-11-27T16:00:00+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": "FUTURE_TIMESTAMP_OR_NEXT_SETTLEMENT",
+        "note": ""
+      },
+      "derivatives.BTC.oi": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:32.409325+08:00",
+        "data_timestamp": "2026-11-27T11:33:34.339000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.BTC.taker": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:32.409325+08:00",
+        "data_timestamp": "2026-11-27T11:33:33.062000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": true,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Derived from the latest public trades snapshot; no native historical taker series."
+      },
+      "derivatives.BTC.volume": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:32.409325+08:00",
+        "data_timestamp": "2026-11-27T11:33:33.062000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": true,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.BTC.klines": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:32.409325+08:00",
+        "data_timestamp": "2026-11-27T10:00:00+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.ETH.mark": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:35.163899+08:00",
+        "data_timestamp": "2026-11-27T11:33:35.069000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.ETH.funding": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:35.163899+08:00",
+        "data_timestamp": "2026-11-27T16:00:00+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": "FUTURE_TIMESTAMP_OR_NEXT_SETTLEMENT",
+        "note": ""
+      },
+      "derivatives.ETH.oi": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:35.163899+08:00",
+        "data_timestamp": "2026-11-27T11:33:35.843000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.ETH.taker": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:35.163899+08:00",
+        "data_timestamp": "2026-11-27T11:33:35.069000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": true,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Derived from the latest public trades snapshot; no native historical taker series."
+      },
+      "derivatives.ETH.volume": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:35.163899+08:00",
+        "data_timestamp": "2026-11-27T11:33:35.069000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": true,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.ETH.klines": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:35.163899+08:00",
+        "data_timestamp": "2026-11-27T10:00:00+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.SOL.mark": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:36.662455+08:00",
+        "data_timestamp": "2026-11-27T11:33:36.465000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.SOL.funding": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:36.662455+08:00",
+        "data_timestamp": "2026-11-27T16:00:00+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": "FUTURE_TIMESTAMP_OR_NEXT_SETTLEMENT",
+        "note": ""
+      },
+      "derivatives.SOL.oi": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:36.662455+08:00",
+        "data_timestamp": "2026-11-27T11:33:37.343000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.SOL.taker": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:36.662455+08:00",
+        "data_timestamp": "2026-11-27T11:33:36.465000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": true,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Derived from the latest public trades snapshot; no native historical taker series."
+      },
+      "derivatives.SOL.volume": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:36.662455+08:00",
+        "data_timestamp": "2026-11-27T11:33:36.465000+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": true,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "derivatives.SOL.klines": {
+        "source": "OKX public SWAP API",
+        "captured_at": "2026-11-27T11:33:36.662455+08:00",
+        "data_timestamp": "2026-11-27T10:00:00+08:00",
+        "success": true,
+        "fallback": true,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": ""
+      },
+      "macro.S&P 500": {
+        "source": "Yahoo Finance chart API",
+        "captured_at": "2026-11-27T11:33:50.876695+08:00",
+        "data_timestamp": "2026-11-25T22:30:00+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Latest market close; weekend/holiday staleness is expected."
+      },
+      "macro.Nasdaq": {
+        "source": "Yahoo Finance chart API",
+        "captured_at": "2026-11-27T11:33:51.007772+08:00",
+        "data_timestamp": "2026-11-25T22:30:00+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Latest market close; weekend/holiday staleness is expected."
+      },
+      "macro.DXY": {
+        "source": "Yahoo Finance chart API",
+        "captured_at": "2026-11-27T11:33:51.085663+08:00",
+        "data_timestamp": "2026-11-27T11:23:49+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Latest market close; weekend/holiday staleness is expected."
+      },
+      "macro.US10Y": {
+        "source": "Yahoo Finance chart API",
+        "captured_at": "2026-11-27T11:33:51.157278+08:00",
+        "data_timestamp": "2026-11-25T21:20:00+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Latest market close; weekend/holiday staleness is expected."
+      },
+      "macro.Gold": {
+        "source": "Yahoo Finance chart API",
+        "captured_at": "2026-11-27T11:33:51.232044+08:00",
+        "data_timestamp": "2026-11-27T11:23:45+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Latest market close; weekend/holiday staleness is expected."
+      },
+      "macro.WTI": {
+        "source": "Yahoo Finance chart API",
+        "captured_at": "2026-11-27T11:33:51.306368+08:00",
+        "data_timestamp": "2026-11-27T11:23:36+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": false,
+        "timestamp_anomaly": null,
+        "note": "Latest market close; weekend/holiday staleness is expected."
+      },
+      "options.BTC": {
+        "source": "Deribit public options API",
+        "captured_at": "2026-11-27T11:33:51.379948+08:00",
+        "data_timestamp": null,
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": null,
+        "timestamp_anomaly": null,
+        "note": "The response has no single universal snapshot timestamp; retrieval time is recorded."
+      },
+      "options.ETH": {
+        "source": "Deribit public options API",
+        "captured_at": "2026-11-27T11:33:51.612452+08:00",
+        "data_timestamp": null,
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": null,
+        "timestamp_anomaly": null,
+        "note": "The response has no single universal snapshot timestamp; retrieval time is recorded."
+      },
+      "stablecoins.total_usd": {
+        "source": "DefiLlama stablecoins API",
+        "captured_at": "2026-11-27T11:33:32.409322+08:00",
+        "data_timestamp": null,
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": null,
+        "timestamp_anomaly": null,
+        "note": "Aggregate is derived by summing peggedAssets; API response has no single aggregate timestamp."
+      },
+      "depth_btc": {
+        "source": "OKX public SWAP order-book API",
+        "captured_at": "2026-11-27T11:33:32.409322+08:00",
+        "data_timestamp": null,
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": false,
+        "stale": null,
+        "timestamp_anomaly": null,
+        "note": "Order-book snapshot retrieval time is the freshness timestamp."
+      },
+      "whale_treasury_orderflow": {
+        "source": "Binance/OKX spot + mempool.space + SEC EDGAR adapters",
+        "captured_at": "2026-11-27T11:33:32.409322+08:00",
+        "data_timestamp": "2026-11-27T11:33:32.409322+08:00",
+        "success": true,
+        "fallback": false,
+        "estimated_or_derived": true,
+        "stale": null,
+        "timestamp_anomaly": null,
+        "note": "Subfields retain their own venue/evidence coverage; wallet-labelled CEX netflow may be unavailable."
+      }
+    },
+    "summary": {
+      "field_count": 29,
+      "success_count": 29,
+      "stale_count": 0,
+      "estimated_or_derived_count": 7
+    },
+    "guardrail": "A successful report only means the document build completed; field-level availability and freshness are recorded separately."
+  }
+}
